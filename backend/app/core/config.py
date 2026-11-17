@@ -20,19 +20,26 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = "nutriscan_user"
     POSTGRES_PASSWORD: str = "nutriscan_secure_pass_2026"
     DATABASE_URL_OVERRIDE: Optional[str] = None
+    DATABASE_URL_CONFIG: Optional[str] = os.getenv("DATABASE_URL")
 
     @property
     def DATABASE_URL(self) -> str:
         if self.DATABASE_URL_OVERRIDE:
             return self.DATABASE_URL_OVERRIDE
-        # If env has DATABASE_URL, use that
-        env_url = os.getenv("DATABASE_URL")
+        env_url = os.getenv("DATABASE_URL") or self.DATABASE_URL_CONFIG
         if env_url:
             return env_url
-        return (
-            f"postgresql+psycopg2://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
-            f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
-        )
+        
+        # Check if psycopg2 is installed; if not, use SQLite fallback for local testing
+        try:
+            import psycopg2  # noqa: F401
+            return (
+                f"postgresql+psycopg2://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+                f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+            )
+        except ImportError:
+            db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "nutriscan.db")
+            return f"sqlite:///{db_path}"
 
     # JWT Security Settings
     SECRET_KEY: str = "94a5e3f48a12e84d72bc9166f283d5a49c0683058b8f2d57929a531bcf91c01e"

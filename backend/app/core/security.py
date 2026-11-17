@@ -1,23 +1,26 @@
 """Security module: Password hashing, token generation, and verification."""
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any
-from passlib.context import CryptContext
+import bcrypt
 from jose import JWTError, jwt
 from fastapi import HTTPException, status
 from app.core.config import settings
 
-# Passlib CryptContext for bcrypt hashing (SEC-001)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 def hash_password(password: str) -> str:
-    """Hashes a plaintext password using bcrypt with salt."""
-    return pwd_context.hash(password)
+    """Hashes a plaintext password using bcrypt with salt (SEC-001)."""
+    pwd_bytes = password.encode("utf-8")[:72]
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(pwd_bytes, salt).decode("utf-8")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verifies a plaintext password against a stored hash."""
-    return pwd_context.verify(plain_password, hashed_password)
+    """Verifies a plaintext password against a stored bcrypt hash."""
+    pwd_bytes = plain_password.encode("utf-8")[:72]
+    try:
+        return bcrypt.checkpw(pwd_bytes, hashed_password.encode("utf-8"))
+    except Exception:
+        return False
 
 
 def create_access_token(subject: Any, role: str, expires_delta: Optional[timedelta] = None) -> str:

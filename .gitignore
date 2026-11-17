@@ -61,6 +61,12 @@ Thumbs.db
 # Alembic
 backend/alembic/versions/*.pyc
 
+# Database
+*.db
+*.sqlite3
+nutriscan.db
+backend/nutriscan.db
+
 # Test & coverage
 *.coverage
 .tox/
