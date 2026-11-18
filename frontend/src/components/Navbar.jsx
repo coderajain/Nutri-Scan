@@ -17,7 +17,7 @@ export const Navbar = () => {
   const isActive = (path) => location.pathname === path;
 
   return (
-    <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
+    <header className="bg-slate-950/75 backdrop-blur-md text-white border-b border-white/10 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
           {/* Brand Logo & Academic Badge */}
@@ -28,10 +28,10 @@ export const Navbar = () => {
                 alt="NutriScan Logo"
                 className="h-9 w-auto object-contain transition-transform group-hover:scale-105"
               />
-              <div className="hidden sm:flex flex-col border-l border-slate-200 pl-3">
+              <div className="hidden sm:flex flex-col border-l border-white/10 pl-3">
                 <div className="flex items-center space-x-1.5">
-                  <span className="text-[11px] font-bold tracking-wide uppercase text-slate-700">Audit & Screening</span>
-                  <span className="text-[10px] px-1.5 py-0.2 font-semibold bg-emerald-50 text-emerald-700 rounded border border-emerald-200">v1.0</span>
+                  <span className="text-[11px] font-bold tracking-wide uppercase text-slate-200">Audit & Screening</span>
+                  <span className="text-[10px] px-1.5 py-0.2 font-semibold bg-emerald-950/80 text-emerald-400 rounded border border-emerald-500/30">v1.0</span>
                 </div>
                 <span className="text-[10px] text-slate-400 font-medium">
                   Food Safety & Legal Metrology
@@ -46,7 +46,7 @@ export const Navbar = () => {
               <Link
                 to="/dashboard"
                 className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-medium transition ${
-                  isActive('/dashboard') ? 'bg-slate-100 text-brand-700' : 'text-slate-600 hover:bg-slate-50'
+                  isActive('/dashboard') ? 'bg-white/10 text-emerald-400 font-semibold' : 'text-slate-300 hover:bg-white/5 hover:text-white'
                 }`}
               >
                 <LayoutDashboard className="h-4 w-4" />
@@ -58,7 +58,7 @@ export const Navbar = () => {
                 className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold transition ${
                   isActive('/scan')
                     ? 'bg-brand-600 text-white shadow-sm'
-                    : 'bg-brand-50 text-brand-700 hover:bg-brand-100'
+                    : 'bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-900/60'
                 }`}
               >
                 <ScanLine className="h-4 w-4" />
@@ -68,7 +68,7 @@ export const Navbar = () => {
               <Link
                 to="/history"
                 className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-medium transition ${
-                  isActive('/history') ? 'bg-slate-100 text-brand-700' : 'text-slate-600 hover:bg-slate-50'
+                  isActive('/history') ? 'bg-white/10 text-emerald-400 font-semibold' : 'text-slate-300 hover:bg-white/5 hover:text-white'
                 }`}
               >
                 <History className="h-4 w-4" />
@@ -79,24 +79,24 @@ export const Navbar = () => {
                 <Link
                   to="/admin/rules"
                   className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-medium transition ${
-                    isActive('/admin/rules') ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'
+                    isActive('/admin/rules') ? 'bg-blue-950/60 text-blue-400 border border-blue-500/30' : 'text-slate-300 hover:bg-white/5 hover:text-white'
                   }`}
                 >
-                  <Settings className="h-4 w-4 text-blue-600" />
+                  <Settings className="h-4 w-4 text-blue-400" />
                   <span className="hidden md:inline">Rule Manager</span>
                 </Link>
               )}
 
               {/* User Profile Badge & Logout */}
-              <div className="flex items-center space-x-2 pl-3 border-l border-slate-200">
+              <div className="flex items-center space-x-2 pl-3 border-l border-white/10">
                 <div className="flex flex-col text-right hidden lg:block">
-                  <span className="text-xs font-bold text-slate-800">{user.full_name}</span>
-                  <span className="text-[10px] text-slate-500 uppercase font-semibold">{user.role}</span>
+                  <span className="text-xs font-bold text-slate-200">{user.full_name}</span>
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold">{user.role}</span>
                 </div>
                 <button
                   onClick={handleLogout}
                   title="Sign Out"
-                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                  className="p-2 text-slate-400 hover:text-red-400 hover:bg-white/5 rounded-lg transition"
                 >
                   <LogOut className="h-4 w-4" />
                 </button>
@@ -106,13 +106,13 @@ export const Navbar = () => {
             <div className="flex items-center space-x-3">
               <Link
                 to="/login"
-                className="text-sm font-semibold text-slate-700 hover:text-brand-600 px-3 py-2"
+                className="text-sm font-semibold text-slate-300 hover:text-white px-3 py-2 transition"
               >
                 Sign In
               </Link>
               <Link
                 to="/register"
-                className="bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm transition"
+                className="bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm transition"
               >
                 Register
               </Link>

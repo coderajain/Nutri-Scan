@@ -38,13 +38,13 @@ export const Login = () => {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-[#060D0B] via-[#091512] to-[#0F172A] flex items-center justify-center lg:justify-start lg:pl-24 py-12 px-4 sm:px-6">
-      {/* Background Visual and Ambient Decorative Scene */}
+    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-[#06110E] via-[#081513] to-[#0B1726]">
+      {/* Background Visual and 4 Angled 3D Floating Glass Cards */}
       <AuthBackgroundVisual />
 
-      {/* Existing Login Box Wrapped in Frosted Glass Container */}
-      <div className="relative z-10 w-full max-w-md">
-        <div className="backdrop-blur-xl bg-slate-900/75 border border-emerald-500/20 shadow-2xl rounded-[32px] p-2 sm:p-2.5">
+      {/* Existing White Login Card Centered Dead-Center with Radial Glow */}
+      <div className="relative z-10 flex items-center justify-center min-h-[calc(100vh-72px)] px-4 py-8">
+        <div className="w-full max-w-md shadow-[0_0_80px_rgba(16,185,129,0.22)] rounded-3xl">
           <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
             {/* Header */}
             <div className="text-center">
