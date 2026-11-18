@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     DEMO_EMAIL: str = "demo@nutriscan.local"
     DEMO_PASSWORD: str = "DemoPassword@2026!"
 
+    # Tesseract OCR
+    TESSERACT_CMD: str = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
     # CORS
     CORS_ORIGINS: list[str] = ["*"]
 

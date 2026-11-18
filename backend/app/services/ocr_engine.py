@@ -3,33 +3,41 @@ import os
 import shutil
 import pytesseract
 from PIL import Image
+from app.core.config import settings
 import logging
 
 logger = logging.getLogger("nutriscan.services.ocr_engine")
+
+# Set Tesseract path at module load time from settings / env
+_tess_cmd = settings.TESSERACT_CMD
+if _tess_cmd and os.path.exists(_tess_cmd):
+    pytesseract.pytesseract.tesseract_cmd = _tess_cmd
+    logger.info(f"Tesseract configured: {_tess_cmd}")
+else:
+    # Fallback: scan common Windows locations
+    for _p in [
+        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+    ]:
+        if os.path.exists(_p):
+            pytesseract.pytesseract.tesseract_cmd = _p
+            logger.info(f"Tesseract auto-detected: {_p}")
+            break
 
 
 class OCREngine:
     """Invokes Tesseract OCR 5.x on the preprocessed image and extracts raw text + confidence metadata."""
 
     def __init__(self, tesseract_cmd: str = None):
-        if tesseract_cmd:
+        if tesseract_cmd and os.path.exists(tesseract_cmd):
             pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
-        else:
-            # Check standard Windows paths if on Windows
-            win_paths = [
-                r"C:\Program Files\Tesseract-OCR\tesseract.exe",
-                r"C:\Users\hp\AppData\Local\Programs\Tesseract-OCR\tesseract.exe",
-            ]
-            for p in win_paths:
-                if os.path.exists(p):
-                    pytesseract.pytesseract.tesseract_cmd = p
-                    break
 
     @classmethod
     def is_tesseract_available(cls) -> bool:
         """Checks if Tesseract binary is accessible."""
         try:
-            return shutil.which("tesseract") is not None or os.path.exists(pytesseract.pytesseract.tesseract_cmd)
+            cmd = pytesseract.pytesseract.tesseract_cmd
+            return bool(cmd and os.path.exists(cmd)) or shutil.which("tesseract") is not None
         except Exception:
             return False
 

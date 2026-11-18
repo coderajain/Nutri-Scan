@@ -31,7 +31,7 @@ export const Navbar = () => {
                   <span className="text-xs ml-1.5 px-2 py-0.5 font-semibold bg-slate-100 text-slate-600 rounded-full border border-slate-200">v1.0</span>
                 </span>
                 <span className="text-[10px] text-slate-500 font-medium hidden sm:inline">
-                  Medi-Caps University | B.Tech CSE Project-1
+                  Food Safety & Legal Metrology Screening
                 </span>
               </div>
             </Link>

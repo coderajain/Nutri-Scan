@@ -1,14 +1,6 @@
 # NutriScan v1.0
 ### An AI-Assisted System for Packaged Food Label Analysis, Nutritional Assessment, and Legal Metrology Compliance
 
-**Target GitHub Repository:** `https://github.com/coderajain/Nutri-Scan`  
-**Academic Context:** B.Tech Computer Science & Engineering (Project-1)  
-**Institution:** Department of Computer Science & Engineering, Faculty of Engineering, **Medi-Caps University, Indore (M.P.) - 453331**  
-**Student Name:** Aashay Jain  
-**Enrollment Number:** EN23CS301020  
-**Project Guide:** Prof. Dr. Safdar Sardar Khan  
-**Academic Session:** August – December 2026  
-
 ---
 
 ## 1. Executive Summary & Architecture Overview
@@ -231,6 +223,6 @@ tests/test_scoring_engine.py::test_insufficient_nutrition_data PASSED
 ## 9. Academic & Regulatory Disclaimer Notice
 
 > **IMPORTANT REGULATORY AND MEDICAL NOTICE:**  
-> 1. **Automated Screening Tool (`SAF-001`, `LM-007`):** NutriScan v1.0 is developed as an academic engineering prototype (B.Tech CSE Project-1, Medi-Caps University). It provides automated decision-support screening and does NOT constitute a statutory or legally binding certification of compliance under the Legal Metrology Act, 2009 or FSSAI Regulations.  
+> 1. **Automated Screening Tool (`SAF-001`, `LM-007`):** NutriScan v1.0 is developed as an automated screening tool. It provides automated decision-support screening and does NOT constitute a statutory or legally binding certification of compliance under the Legal Metrology Act, 2009 or FSSAI Regulations.  
 > 2. **Informational Nutritional Assessment (`SAF-002`):** Nutritional metrics, additive warnings, and health profile scores represent informational estimates derived from label declarations and general dietary guidelines. They do NOT constitute medical diagnosis, clinical treatment, or personalized clinical nutrition advice.  
 > 3. **Physical Scale Heuristics (`LM-005`):** Physical package properties (e.g. printed font height in millimeters per Table II of LM-PC Rules 2011) cannot be certified conclusively from digital images without physical scale calibration references and require manual verification.

@@ -89,7 +89,7 @@ class PDFReportGenerator:
         # 1. Header Banner
         elements.append(Paragraph("<b>NutriScan v1.0</b> — Packaging Compliance & Nutritional Audit", title_style))
         elements.append(Paragraph(
-            "Department of Computer Science & Engineering | Medi-Caps University, Indore<br/>"
+            "Automated Packaged Food Audit & Decision Support System<br/>"
             f"<b>Scan Reference ID:</b> {scan_id} &nbsp;|&nbsp; <b>Timestamp:</b> {created_at_str} &nbsp;|&nbsp; <b>Rule Version:</b> {rule_version_tag}",
             subtitle_style
         ))
@@ -175,7 +175,7 @@ class PDFReportGenerator:
             [
                 Paragraph(
                     "<b>REGULATORY AND MEDICAL DISCLAIMER NOTICE:</b><br/>"
-                    "1. <b>Automated Decision Support Screening (SAF-001):</b> This document is an automated screening aid developed for academic research (B.Tech CSE Project-1, Medi-Caps University). It does NOT constitute a statutory or legally binding certification of compliance under the Legal Metrology Act, 2009 or FSSAI Regulations.<br/>"
+                    "1. <b>Automated Decision Support Screening (SAF-001):</b> This document is an automated screening aid. It does NOT constitute a statutory or legally binding certification of compliance under the Legal Metrology Act, 2009 or FSSAI Regulations.<br/>"
                     "2. <b>Informational Nutritional Assessment (SAF-002):</b> Nutritional scores and alerts are computed from visible label declarations and general dietary guidelines. They do NOT constitute medical diagnosis, treatment, or personalized clinical nutrition advice.<br/>"
                     "3. <b>Physical Scale Heuristics (LM-005):</b> Physical packaging dimensions, such as printed font heights, cannot be conclusively certified from digital photographs without physical calibration scale references and require manual verification.",
                     disclaimer_style,

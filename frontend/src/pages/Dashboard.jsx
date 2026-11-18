@@ -38,7 +38,7 @@ export const Dashboard = () => {
       {/* Welcome Banner */}
       <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-3xl p-6 sm:p-8 text-white shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
         <div>
-          <span className="text-xs font-bold text-brand-400 uppercase tracking-wider">Medi-Caps University Project-1</span>
+          <span className="text-xs font-bold text-brand-400 uppercase tracking-wider">Packaged Food Compliance & Assessment</span>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight mt-1">
             Welcome back, {user?.full_name?.split(' ')[0]}!
           </h1>

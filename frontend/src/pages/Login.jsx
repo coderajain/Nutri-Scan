@@ -45,7 +45,7 @@ export const Login = () => {
           </div>
           <h2 className="mt-4 text-2xl font-black text-slate-900 tracking-tight">Sign in to NutriScan</h2>
           <p className="mt-1 text-xs text-slate-500">
-            Medi-Caps University Project-1 &bull; Packaged Food Audit System
+            Packaged Food Regulatory & Nutritional Audit System
           </p>
         </div>
 

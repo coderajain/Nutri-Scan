@@ -18,7 +18,7 @@ def seed_users(db: Session) -> dict[str, User]:
         admin_user = User(
             email=settings.ADMIN_EMAIL,
             hashed_password=hash_password(settings.ADMIN_PASSWORD),
-            full_name="Aashay Jain (Project Lead / Admin)",
+            full_name="System Administrator",
             role=UserRole.ADMINISTRATOR,
             is_active=True,
         )
@@ -26,6 +26,9 @@ def seed_users(db: Session) -> dict[str, User]:
         db.commit()
         db.refresh(admin_user)
         logger.info(f"Seeded default administrator: {settings.ADMIN_EMAIL}")
+    else:
+        admin_user.full_name = "System Administrator"
+        db.commit()
     users_created["admin"] = admin_user
 
     # 2. Standard demo user
@@ -34,7 +37,7 @@ def seed_users(db: Session) -> dict[str, User]:
         demo_user = User(
             email=settings.DEMO_EMAIL,
             hashed_password=hash_password(settings.DEMO_PASSWORD),
-            full_name="Medi-Caps Evaluator (Demo User)",
+            full_name="Standard Demo User",
             role=UserRole.STANDARD,
             is_active=True,
         )
@@ -42,6 +45,9 @@ def seed_users(db: Session) -> dict[str, User]:
         db.commit()
         db.refresh(demo_user)
         logger.info(f"Seeded default demo user: {settings.DEMO_EMAIL}")
+    else:
+        demo_user.full_name = "Standard Demo User"
+        db.commit()
     users_created["demo"] = demo_user
 
     return users_created
