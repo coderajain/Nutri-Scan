@@ -71,7 +71,9 @@ class FieldExtractor:
         if not lines:
             return None
         # Heuristic: the top prominent line that isn't a date, license, or address
-        for line in lines[:5]:
+        for line in lines[:8]:
+            if line.startswith(("-", "=", "*", "#")) or "packaging face" in line.lower():
+                continue
             if not re.search(r'(fssai|lic|mrp|mfg|exp|batch|net qty|regd|address|pvt|ltd)', line, re.IGNORECASE):
                 if len(line) <= 60:
                     return {

@@ -1,12 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import apiClient from '../api/client';
-import { UploadCloud, Camera, ArrowRight, AlertCircle, CheckCircle2, ShieldCheck, Scale } from 'lucide-react';
+import {
+  UploadCloud,
+  Camera,
+  ArrowRight,
+  AlertCircle,
+  CheckCircle2,
+  X,
+  Layers,
+  Sparkles,
+  FileText,
+  Package,
+  ExternalLink,
+  Plus
+} from 'lucide-react';
 import { Disclaimers } from '../components/Disclaimers';
 
 export const ScanUpload = () => {
-  const [file, setFile] = useState(null);
-  const [preview, setPreview] = useState(null);
+  const [files, setFiles] = useState([]);
+  const [uploadMode, setUploadMode] = useState('multi_face'); // 'multi_face' or 'batch'
   const [productName, setProductName] = useState('');
   const [brandName, setBrandName] = useState('');
   const [ruleVersionTag, setRuleVersionTag] = useState('LM-PC-2011-v1.0');
@@ -14,6 +27,7 @@ export const ScanUpload = () => {
   const [loading, setLoading] = useState(false);
   const [processingStage, setProcessingStage] = useState('');
   const [error, setError] = useState('');
+  const [batchResults, setBatchResults] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -29,90 +43,155 @@ export const ScanUpload = () => {
     fetchVersions();
   }, []);
 
-  const handleFileChange = (e) => {
-    const selected = e.target.files[0];
-    if (!selected) return;
+  const handleFilesAdded = (newFileList) => {
+    if (!newFileList || newFileList.length === 0) return;
 
-    // Validate size (<= 15MB) (SCAN-002, NFR-PERF-007)
-    if (selected.size > 15 * 1024 * 1024) {
-      setError('File exceeds maximum upload size of 15MB.');
-      return;
-    }
-
-    // Validate type (SCAN-001)
     const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
-    if (!validTypes.includes(selected.type)) {
-      setError('Unsupported file format. Please upload JPG, JPEG, PNG, or WEBP.');
-      return;
+    const maxBytes = 15 * 1024 * 1024;
+    const addedFiles = [];
+    let errMessage = '';
+
+    Array.from(newFileList).forEach((file) => {
+      if (!validTypes.includes(file.type)) {
+        errMessage = `Skipped "${file.name}": Unsupported format. Allowed: JPG, PNG, WEBP.`;
+        return;
+      }
+      if (file.size > maxBytes) {
+        errMessage = `Skipped "${file.name}": Exceeds maximum 15MB limit.`;
+        return;
+      }
+      addedFiles.push({
+        file,
+        preview: URL.createObjectURL(file),
+        id: Math.random().toString(36).substring(2, 9),
+      });
+    });
+
+    if (errMessage) {
+      setError(errMessage);
+    } else {
+      setError('');
     }
 
-    setError('');
-    setFile(selected);
-    setPreview(URL.createObjectURL(selected));
+    setFiles((prev) => [...prev, ...addedFiles]);
+  };
+
+  const handleRemoveFile = (idToRemove) => {
+    setFiles((prev) => {
+      const target = prev.find((item) => item.id === idToRemove);
+      if (target && target.preview) {
+        URL.revokeObjectURL(target.preview);
+      }
+      return prev.filter((item) => item.id !== idToRemove);
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!file) {
-      setError('Please select or capture a label image.');
+    if (files.length === 0) {
+      setError('Please select or capture at least one packaging image.');
       return;
     }
 
     setError('');
     setLoading(true);
-
-    // Processing animation stages (NFR-PERF-003)
-    setProcessingStage('1/5: Preserving evidence and executing OpenCV preprocessing...');
-    const stageTimer1 = setTimeout(() => {
-      setProcessingStage('2/5: Invoking Tesseract OCR text recognition engine...');
-    }, 1500);
-    const stageTimer2 = setTimeout(() => {
-      setProcessingStage('3/5: Extracting packaged commodity declarations & nutrition table...');
-    }, 3500);
-    const stageTimer3 = setTimeout(() => {
-      setProcessingStage('4/5: Evaluating Legal Metrology statutory rules & ICMR criteria...');
-    }, 5500);
-    const stageTimer4 = setTimeout(() => {
-      setProcessingStage('5/5: Generating publication-grade ReportLab PDF report...');
-    }, 7500);
+    setBatchResults(null);
 
     const formData = new FormData();
-    formData.append('file', file);
-    if (productName) formData.append('product_name', productName);
-    if (brandName) formData.append('brand_name', brandName);
+    files.forEach((item) => {
+      formData.append('files', item.file);
+    });
     formData.append('rule_version_tag', ruleVersionTag);
 
-    try {
-      const res = await apiClient.post('/scans/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      clearTimeout(stageTimer1);
-      clearTimeout(stageTimer2);
-      clearTimeout(stageTimer3);
-      clearTimeout(stageTimer4);
-      navigate(`/scan/${res.data.id}`);
-    } catch (err) {
-      clearTimeout(stageTimer1);
-      clearTimeout(stageTimer2);
-      clearTimeout(stageTimer3);
-      clearTimeout(stageTimer4);
-      setError(err.response?.data?.detail || 'Scan processing failed. Please ensure the image is clear.');
-      setLoading(false);
+    if (uploadMode === 'multi_face') {
+      if (productName) formData.append('product_name', productName);
+      if (brandName) formData.append('brand_name', brandName);
+
+      setProcessingStage(`1/4: Analyzing ${files.length} packaging view${files.length > 1 ? 's' : ''} with OpenCV & CLAHE...`);
+      const timer1 = setTimeout(() => {
+        setProcessingStage('2/4: Detecting 1D/2D Barcodes, GS1 prefixes & QR codes...');
+      }, 1500);
+      const timer2 = setTimeout(() => {
+        setProcessingStage('3/4: Multi-pass Tesseract OCR text recognition & label field parsing...');
+      }, 3500);
+      const timer3 = setTimeout(() => {
+        setProcessingStage('4/4: Evaluating Legal Metrology statutory rules and compiling PDF...');
+      }, 5500);
+
+      try {
+        const res = await apiClient.post('/scans/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+        clearTimeout(timer3);
+        navigate(`/scan/${res.data.id}`);
+      } catch (err) {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+        clearTimeout(timer3);
+        setError(err.response?.data?.detail || 'Multi-view scan failed. Please check image quality.');
+        setLoading(false);
+      }
+    } else {
+      // Batch mode
+      setProcessingStage(`Batch auditing ${files.length} individual packaged products...`);
+      try {
+        const res = await apiClient.post('/scans/batch', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        setBatchResults(res.data);
+        setLoading(false);
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Batch processing failed.');
+        setLoading(false);
+      }
     }
   };
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+      {/* Title */}
       <div className="text-center mb-8">
-        <span className="text-xs font-bold text-brand-600 uppercase tracking-wider">Packaged Commodity Scanner</span>
+        <span className="text-xs font-bold text-brand-600 uppercase tracking-wider">Packaged Commodity Audit</span>
         <h1 className="text-3xl font-black text-slate-900 tracking-tight mt-1">
-          Scan & Analyze Label Image
+          Scan & Analyze Packaging
         </h1>
         <p className="text-sm text-slate-500 mt-1 max-w-xl mx-auto">
-          Upload or capture a clear photo of the food packaging label. NutriScan extracts visible text, verifies statutory declarations, and calculates compliance and nutrition scores.
+          Upload single or multiple packaging faces (Front, Back, Nutrition Facts Table, Barcode) for a unified regulatory & nutritional compliance audit.
         </p>
+      </div>
+
+      {/* Mode Selector */}
+      <div className="flex justify-center mb-6">
+        <div className="bg-slate-100 p-1 rounded-2xl flex space-x-1 border border-slate-200">
+          <button
+            type="button"
+            onClick={() => { setUploadMode('multi_face'); setBatchResults(null); }}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
+              uploadMode === 'multi_face'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Layers className="h-4 w-4 text-brand-600" />
+            <span>Multi-Face Package Scan</span>
+            <span className="text-[10px] bg-brand-50 text-brand-700 px-1.5 py-0.5 rounded-md font-semibold">Single Item</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setUploadMode('batch'); setBatchResults(null); }}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
+              uploadMode === 'batch'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Package className="h-4 w-4 text-metrology-600" />
+            <span>Batch Product Scan</span>
+            <span className="text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded-md font-semibold">Multiple Items</span>
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -122,10 +201,64 @@ export const ScanUpload = () => {
         </div>
       )}
 
+      {/* Batch Results View (if completed) */}
+      {batchResults && (
+        <div className="mb-8 bg-white p-6 rounded-3xl border border-slate-200 shadow-xs">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-200 mb-4">
+            <h2 className="text-base font-extrabold text-slate-900 flex items-center space-x-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              <span>Batch Audit Completed ({batchResults.successful_scans.length} / {batchResults.total_uploaded} Scanned)</span>
+            </h2>
+            <button
+              onClick={() => { setBatchResults(null); setFiles([]); }}
+              className="text-xs font-bold text-brand-600 hover:underline"
+            >
+              Start New Upload
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {batchResults.successful_scans.map((item, idx) => (
+              <div
+                key={item.id}
+                className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:bg-slate-100 transition"
+              >
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-bold text-slate-400">#{idx + 1}</span>
+                    <span className="text-sm font-bold text-slate-900">{item.product_name || 'Packaged Commodity'}</span>
+                    {item.barcode && (
+                      <span className="text-[10px] font-mono bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-bold">
+                        {item.barcode}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1 flex items-center space-x-3">
+                    <span>Legal Metrology: <b>{item.compliance_score !== null ? `${Math.round(item.compliance_score)}/100` : '—'}</b></span>
+                    <span>&bull;</span>
+                    <span>Nutrition: <b>{item.nutrition_score !== null ? `${Math.round(item.nutrition_score)}/100` : 'Insufficient'}</b></span>
+                  </div>
+                </div>
+
+                <Link
+                  to={`/scan/${item.id}`}
+                  className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-brand-600 text-white rounded-xl text-xs font-bold hover:bg-brand-700 transition shrink-0"
+                >
+                  <span>View Audit</span>
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center shadow-xs">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-brand-500 border-t-transparent mx-auto"></div>
-          <h3 className="mt-6 text-lg font-bold text-slate-900">Processing Packaged Commodity Label</h3>
+          <h3 className="mt-6 text-lg font-bold text-slate-900">
+            {uploadMode === 'multi_face' ? 'Processing Multi-View Package Audit' : 'Executing Batch Product Analysis'}
+          </h3>
           <p className="mt-2 text-xs font-medium text-slate-500 animate-pulse">{processingStage}</p>
           <div className="mt-6 max-w-xs mx-auto bg-slate-100 rounded-full h-2 overflow-hidden">
             <div className="bg-brand-600 h-full w-2/3 animate-pulse"></div>
@@ -133,67 +266,129 @@ export const ScanUpload = () => {
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Upload Area */}
-          <div className="bg-white rounded-3xl border-2 border-dashed border-slate-300 p-8 hover:border-brand-500 transition cursor-pointer relative text-center">
+          {/* Multi-File Upload Drop Area */}
+          <div className="bg-white rounded-3xl border-2 border-dashed border-slate-300 p-6 sm:p-8 hover:border-brand-500 transition relative text-center">
             <input
               type="file"
+              multiple
               accept="image/jpeg,image/png,image/jpg,image/webp"
-              onChange={handleFileChange}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              onChange={(e) => handleFilesAdded(e.target.files)}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
             />
-            {preview ? (
-              <div className="flex flex-col items-center">
-                <img
-                  src={preview}
-                  alt="Label Preview"
-                  className="max-h-72 rounded-2xl shadow-sm border border-slate-200 object-contain"
-                />
-                <p className="mt-4 text-xs font-bold text-brand-600">Click or tap to replace photo</p>
+            <div className="flex flex-col items-center">
+              <div className="p-4 bg-brand-50 rounded-2xl text-brand-600 mb-3">
+                <UploadCloud className="h-8 w-8" />
               </div>
-            ) : (
-              <div className="py-8 flex flex-col items-center">
-                <div className="p-4 bg-brand-50 rounded-2xl text-brand-600 mb-3">
-                  <UploadCloud className="h-8 w-8" />
-                </div>
-                <h3 className="text-base font-bold text-slate-900">Upload Label Photograph</h3>
-                <p className="text-xs text-slate-500 mt-1">PNG, JPG, or WEBP up to 15MB</p>
-                <div className="mt-4 flex items-center space-x-2 text-xs text-slate-400">
-                  <Camera className="h-4 w-4" />
-                  <span>Supports desktop file browser or smartphone camera capture</span>
-                </div>
+              <h3 className="text-base font-bold text-slate-900">
+                {uploadMode === 'multi_face'
+                  ? 'Drop or Select Multiple Package Faces'
+                  : 'Drop Multiple Product Images for Batch Audit'}
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                {uploadMode === 'multi_face'
+                  ? 'Select 1 or more photos: Front (PDP), Back (Nutrition Table & Ingredients), Barcode / Side face'
+                  : 'Upload up to 15 different product label images simultaneously'}
+              </p>
+              <div className="mt-4 flex items-center space-x-2 text-xs text-slate-400">
+                <Camera className="h-4 w-4" />
+                <span>Supports multiple photo selections (JPG, PNG, WEBP up to 15MB each)</span>
               </div>
-            )}
+            </div>
           </div>
 
-          {/* Optional Metadata & Version Selection */}
+          {/* Selected Files Thumbnail Preview Grid */}
+          {files.length > 0 && (
+            <div className="bg-white p-5 rounded-3xl border border-slate-200">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+                  Selected Images ({files.length})
+                </h3>
+                <span className="text-[11px] text-brand-600 font-semibold">
+                  {uploadMode === 'multi_face'
+                    ? 'All faces will be merged into one unified audit'
+                    : 'Each image will generate a separate product audit'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {files.map((item, idx) => (
+                  <div
+                    key={item.id}
+                    className="relative group rounded-2xl border border-slate-200 bg-slate-50 p-2 flex flex-col items-center text-center overflow-hidden"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFile(item.id)}
+                      className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 shadow-md hover:bg-red-700 transition z-20"
+                      title="Remove image"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                    <img
+                      src={item.preview}
+                      alt={`Upload preview ${idx + 1}`}
+                      className="h-24 w-full object-contain rounded-xl bg-white border border-slate-100"
+                    />
+                    <div className="mt-2 w-full px-1">
+                      <span className="text-[10px] font-bold text-slate-700 block truncate">
+                        {uploadMode === 'multi_face' ? `Face ${idx + 1}: ${item.file.name}` : item.file.name}
+                      </span>
+                      <span className="text-[9px] text-slate-400">
+                        {(item.file.size / (1024 * 1024)).toFixed(2)} MB
+                      </span>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Add more files card */}
+                <label className="border-2 border-dashed border-slate-200 hover:border-brand-400 rounded-2xl flex flex-col items-center justify-center p-4 cursor-pointer text-slate-400 hover:text-brand-600 transition min-h-[120px]">
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/jpeg,image/png,image/jpg,image/webp"
+                    onChange={(e) => handleFilesAdded(e.target.files)}
+                    className="hidden"
+                  />
+                  <Plus className="h-6 w-6 mb-1" />
+                  <span className="text-[11px] font-bold">Add Another Face</span>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* Optional Metadata (for multi-face single item) & Version Selection */}
           <div className="bg-white p-6 rounded-3xl border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Product Name (Optional)
-              </label>
-              <input
-                type="text"
-                value={productName}
-                onChange={(e) => setProductName(e.target.value)}
-                placeholder="e.g. Whole Wheat Biscuits"
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none focus:bg-white"
-              />
-            </div>
+            {uploadMode === 'multi_face' && (
+              <>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Product Name (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={productName}
+                    onChange={(e) => setProductName(e.target.value)}
+                    placeholder="e.g. Malai Paneer"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none focus:bg-white"
+                  />
+                </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Brand Name (Optional)
-              </label>
-              <input
-                type="text"
-                value={brandName}
-                onChange={(e) => setBrandName(e.target.value)}
-                placeholder="e.g. Healthy Harvest"
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none focus:bg-white"
-              />
-            </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Brand Name (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={brandName}
+                    onChange={(e) => setBrandName(e.target.value)}
+                    placeholder="e.g. Amul"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none focus:bg-white"
+                  />
+                </div>
+              </>
+            )}
 
-            <div>
+            <div className={uploadMode === 'batch' ? 'md:col-span-3' : ''}>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
                 <span>Statutory Rule Version</span>
                 <span className="text-[10px] text-metrology-600 font-semibold">LM-001</span>
@@ -214,10 +409,14 @@ export const ScanUpload = () => {
 
           <button
             type="submit"
-            disabled={!file || loading}
+            disabled={files.length === 0 || loading}
             className="w-full bg-brand-600 hover:bg-brand-700 text-white font-extrabold py-3.5 rounded-2xl shadow-sm text-sm flex items-center justify-center space-x-2 transition disabled:opacity-50"
           >
-            <span>Analyze & Verify Compliance</span>
+            <span>
+              {uploadMode === 'multi_face'
+                ? `Analyze ${files.length > 0 ? `${files.length} Packaging Face${files.length > 1 ? 's' : ''}` : 'Packaging'} & Verify Compliance`
+                : `Execute Batch Audit (${files.length} Product${files.length !== 1 ? 's' : ''})`}
+            </span>
             <ArrowRight className="h-4 w-4" />
           </button>
         </form>
@@ -228,4 +427,5 @@ export const ScanUpload = () => {
     </div>
   );
 };
+
 export default ScanUpload;

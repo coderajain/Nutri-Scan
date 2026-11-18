@@ -15,7 +15,7 @@ from app.models.rule_version import RuleVersion
 from app.models.scan import Scan, ScanStatus
 from app.models.scan_field import ScanField
 from app.models.finding import Finding
-from app.schemas.scan import ScanDetailResponse, ScanSummaryResponse
+from app.schemas.scan import ScanDetailResponse, ScanSummaryResponse, BatchScanResponse
 from app.api.deps import get_current_user, log_audit_event
 from app.services.image_processor import ImageProcessor
 from app.services.ocr_engine import OCREngine
@@ -31,43 +31,38 @@ logger = logging.getLogger("nutriscan.api.scans")
 router = APIRouter(prefix="/scans", tags=["Scanning & OCR"])
 
 
-@router.post("/upload", response_model=ScanDetailResponse)
-async def upload_and_process_scan(
-    request: Request,
-    file: UploadFile = File(...),
-    product_name: str = Form(None),
-    brand_name: str = Form(None),
-    rule_version_tag: str = Form("LM-PC-2011-v1.0"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Main scan pipeline:
-    1. Validates image type/size (SCAN-001, SCAN-002)
-    2. Preserves original evidence (SCAN-003, SEC-006)
-    3. OpenCV preprocessing (SCAN-004)
-    4. Tesseract OCR (OCR-001)
-    5. Information extraction (OCR-005)
-    6. Compliance and nutrition analysis (LM-001, NUT-001)
-    7. Independent scoring (SCORE-001, SCORE-002)
-    8. PDF report generation (REP-001, REP-004)
-    """
+async def _execute_scan_pipeline(
+    upload_files: list[UploadFile],
+    product_name: Optional[str],
+    brand_name: Optional[str],
+    rule_version_tag: str,
+    db: Session,
+    current_user: User,
+    request: Optional[Request] = None,
+) -> dict:
+    """Core scanning pipeline executing OpenCV, Barcode, OCR, Rules, Scoring, and PDF."""
     start_time = time.time()
 
-    # 1. Input Validation (SCAN-001, SCAN-002, SEC-004)
-    if file.content_type not in settings.ALLOWED_IMAGE_TYPES:
+    if not upload_files:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported file format '{file.content_type}'. Allowed types: JPG, JPEG, PNG, WEBP.",
+            detail="No packaging images provided for scanning.",
         )
 
-    # 2. Retrieve Rule Version (LM-001, LM-006)
+    # 1. Input Validation across all files
+    for f in upload_files:
+        if f.content_type not in settings.ALLOWED_IMAGE_TYPES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported file format '{f.content_type}'. Allowed: JPG, JPEG, PNG, WEBP.",
+            )
+
+    # 2. Retrieve Rule Version
     rule_version = db.query(RuleVersion).filter(
         RuleVersion.version_tag == rule_version_tag,
         RuleVersion.is_active == True,
     ).first()
     if not rule_version:
-        # Fallback to any active version
         rule_version = db.query(RuleVersion).filter(RuleVersion.is_active == True).first()
         if not rule_version:
             raise HTTPException(
@@ -75,38 +70,42 @@ async def upload_and_process_scan(
                 detail="No active regulatory rule version available in system.",
             )
 
-    # 3. Secure Evidence Storage (SCAN-003, SEC-006)
+    # 3. Secure Evidence Storage (Isolated directory)
     scan_uuid = str(uuid.uuid4())
     evidence_dir = settings.EVIDENCE_DIR
     os.makedirs(evidence_dir, exist_ok=True)
 
-    file_ext = os.path.splitext(file.filename or "image.jpg")[1].lower()
-    if file_ext not in [".jpg", ".jpeg", ".png", ".webp"]:
-        file_ext = ".jpg"
-
-    original_filename = f"{scan_uuid}_raw{file_ext}"
-    original_file_path = os.path.join(evidence_dir, original_filename)
-    processed_filename = f"{scan_uuid}_proc.png"
-    processed_file_path = os.path.join(evidence_dir, processed_filename)
-    pdf_filename = f"{scan_uuid}_report.pdf"
-    pdf_file_path = os.path.join(evidence_dir, pdf_filename)
-
-    # Stream file to storage
-    file_bytes_read = 0
+    raw_paths = []
+    proc_paths = []
     max_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
-    async with aiofiles.open(original_file_path, "wb") as out_file:
-        while content := await file.read(1024 * 1024):  # 1MB chunks
-            file_bytes_read += len(content)
-            if file_bytes_read > max_bytes:
-                await out_file.close()
-                if os.path.exists(original_file_path):
-                    os.remove(original_file_path)
-                raise HTTPException(
-                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                    detail=f"File exceeds maximum allowed size of {settings.MAX_UPLOAD_SIZE_MB}MB.",
-                )
-            await out_file.write(content)
+    for idx, f in enumerate(upload_files):
+        ext = os.path.splitext(f.filename or "image.jpg")[1].lower()
+        if ext not in [".jpg", ".jpeg", ".png", ".webp"]:
+            ext = ".jpg"
+        raw_p = os.path.join(evidence_dir, f"{scan_uuid}_raw_{idx}{ext}")
+        proc_p = os.path.join(evidence_dir, f"{scan_uuid}_proc_{idx}.png")
+
+        file_bytes_read = 0
+        async with aiofiles.open(raw_p, "wb") as out_file:
+            while content := await f.read(1024 * 1024):
+                file_bytes_read += len(content)
+                if file_bytes_read > max_bytes:
+                    await out_file.close()
+                    if os.path.exists(raw_p):
+                        os.remove(raw_p)
+                    raise HTTPException(
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        detail=f"File exceeds maximum allowed size of {settings.MAX_UPLOAD_SIZE_MB}MB.",
+                    )
+                await out_file.write(content)
+
+        raw_paths.append(raw_p)
+        proc_paths.append(proc_p)
+
+    primary_raw_path = raw_paths[0]
+    primary_proc_path = proc_paths[0]
+    pdf_file_path = os.path.join(evidence_dir, f"{scan_uuid}_report.pdf")
 
     # 4. Create Initial Pending Scan Record
     scan = Scan(
@@ -116,8 +115,8 @@ async def upload_and_process_scan(
         product_name=product_name,
         brand_name=brand_name,
         category="packaged_food",
-        original_image_path=original_file_path,
-        processed_image_path=processed_file_path,
+        original_image_path=primary_raw_path,
+        processed_image_path=primary_proc_path,
         pdf_report_path=pdf_file_path,
         overall_status=ScanStatus.PROCESSING,
     )
@@ -125,46 +124,77 @@ async def upload_and_process_scan(
     db.commit()
 
     try:
-        # 5. Image Preprocessing (SCAN-004)
-        ImageProcessor.preprocess_image(original_file_path, processed_file_path)
+        all_ocr_lines = []
+        all_confidences = []
+        all_uncertainties = []
+        merged_barcodes = []
+        merged_qrs = []
 
-        # 6. Barcode & QR Code Scanning (SCAN-005, LM-004)
-        barcode_result = BarcodeScanner.scan(original_file_path)
+        # 5. Process each uploaded packaging face
+        for idx, (raw_p, proc_p) in enumerate(zip(raw_paths, proc_paths)):
+            # Preprocess image with OpenCV
+            ImageProcessor.preprocess_image(raw_p, proc_p)
 
-        # 7. OCR Text Extraction (OCR-001, OCR-003) using multi-pass recognition
-        ocr_engine = OCREngine()
-        ocr_result = ocr_engine.extract_text(processed_file_path, raw_image_path=original_file_path)
-        raw_text = ocr_result["raw_text"]
-        ocr_conf = ocr_result["confidence_avg"]
-        uncertainty_flags = ocr_result.get("uncertain_flags", [])
+            # Barcode and QR code detection
+            bc_res = BarcodeScanner.scan(raw_p)
+            for b in bc_res.get("barcodes", []):
+                if b["code"] not in [x["code"] for x in merged_barcodes]:
+                    merged_barcodes.append(b)
+            for q in bc_res.get("qr_codes", []):
+                if q["data"] not in [x["data"] for x in merged_qrs]:
+                    merged_qrs.append(q)
 
-        scan.ocr_raw_text = raw_text
-        scan.ocr_confidence_avg = ocr_conf
-        scan.uncertainty_flags = uncertainty_flags
+            # OCR Multi-Pass
+            ocr_engine = OCREngine()
+            ocr_res = ocr_engine.extract_text(proc_p, raw_image_path=raw_p)
+            if ocr_res.get("raw_text"):
+                header = f"--- Packaging Face {idx + 1} ---" if len(raw_paths) > 1 else ""
+                all_ocr_lines.append(f"{header}\n{ocr_res['raw_text']}".strip())
+            if ocr_res.get("confidence_avg", 0) > 0:
+                all_confidences.append(ocr_res["confidence_avg"])
+            if ocr_res.get("uncertain_flags"):
+                all_uncertainties.extend(ocr_res["uncertain_flags"])
 
-        # 8. Field Extraction (OCR-004, OCR-005, OCR-007, NUT-001, NUT-005)
-        extracted = FieldExtractor.extract_all(raw_text)
+        combined_raw_text = "\n\n".join(all_ocr_lines).strip()
+        avg_ocr_conf = round(sum(all_confidences) / len(all_confidences), 2) if all_confidences else 0.0
+
+        scan.ocr_raw_text = combined_raw_text
+        scan.ocr_confidence_avg = avg_ocr_conf
+        scan.uncertainty_flags = list(set(all_uncertainties))
+
+        # 6. Structured Field Extraction
+        extracted = FieldExtractor.extract_all(combined_raw_text)
 
         # Attach detected Barcode & QR Code into declarations
-        if barcode_result.get("primary_barcode"):
+        primary_bc = merged_barcodes[0]["code"] if merged_barcodes else None
+        primary_bc_fmt = merged_barcodes[0]["format"] if merged_barcodes else None
+        primary_bc_country = merged_barcodes[0]["country"] if merged_barcodes else None
+        primary_qr = merged_qrs[0]["data"] if merged_qrs else None
+
+        if primary_bc:
             extracted["declarations"]["barcode"] = {
-                "raw_value": barcode_result["primary_barcode"],
-                "normalized_value": f"{barcode_result['primary_barcode']} ({barcode_result.get('primary_barcode_format', 'BARCODE')}, {barcode_result.get('primary_barcode_country', '')})",
-                "unit": barcode_result.get("primary_barcode_format"),
+                "raw_value": primary_bc,
+                "normalized_value": f"{primary_bc} ({primary_bc_fmt}, {primary_bc_country})",
+                "unit": primary_bc_fmt,
                 "confidence": 100.0,
-                "metadata_payload": barcode_result,
+                "metadata_payload": {
+                    "primary_barcode": primary_bc,
+                    "primary_barcode_format": primary_bc_fmt,
+                    "primary_barcode_country": primary_bc_country,
+                    "barcodes": merged_barcodes,
+                },
             }
 
-        if barcode_result.get("primary_qr"):
+        if primary_qr:
             extracted["declarations"]["qr_code"] = {
-                "raw_value": barcode_result["primary_qr"],
-                "normalized_value": barcode_result["primary_qr"],
+                "raw_value": primary_qr,
+                "normalized_value": primary_qr,
                 "unit": "QR",
                 "confidence": 100.0,
-                "metadata_payload": barcode_result,
+                "metadata_payload": {"qr_codes": merged_qrs},
             }
 
-        # If product_name was not provided by user, take from OCR
+        # If product_name was not provided, take from OCR
         if not scan.product_name and extracted["declarations"].get("product_name"):
             scan.product_name = extracted["declarations"]["product_name"]["normalized_value"]
 
@@ -178,7 +208,7 @@ async def upload_and_process_scan(
                     raw_value=val_dict.get("raw_value"),
                     normalized_value=val_dict.get("normalized_value"),
                     unit=val_dict.get("unit"),
-                    confidence_score=val_dict.get("confidence", ocr_conf),
+                    confidence_score=val_dict.get("confidence", avg_ocr_conf),
                     is_present=True,
                     is_readable=True,
                     extraction_method="opencv_barcode" if field_name == "barcode" else ("opencv_qr" if field_name == "qr_code" else "regex_pattern"),
@@ -194,24 +224,21 @@ async def upload_and_process_scan(
                 raw_value=nut_val.get("raw_value") if nut_val else None,
                 normalized_value=nut_val.get("normalized_value") if nut_val else None,
                 unit=nut_val.get("unit") if nut_val else None,
-                confidence_score=nut_val.get("confidence", ocr_conf) if nut_val else None,
+                confidence_score=nut_val.get("confidence", avg_ocr_conf) if nut_val else None,
                 is_present=nut_val is not None,
                 is_readable=nut_val is not None,
                 extraction_method="table_parser",
             )
             db.add(db_field)
 
-        # 8. Legal Metrology Compliance Rule Evaluation (LM-001 - LM-007)
+        # 7. Compliance and Nutrition Evaluation
         lm_findings_raw = ComplianceEngine.evaluate(rule_version.rules, extracted)
-
-        # 9. Nutrition & Additive Analysis (NUT-001 - NUT-006, SAF-002)
         nutrition_findings_raw, nutrition_metrics = NutritionEngine.analyze(
             extracted["nutrition"], extracted["ingredients"]
         )
-
         all_findings_raw = lm_findings_raw + nutrition_findings_raw
 
-        # 10. Scoring (SCORE-001, SCORE-002: Separated scores)
+        # 8. Scoring
         compliance_score, comp_status, has_manual_flags = ScoringEngine.calculate_compliance_score(lm_findings_raw)
         nutrition_score, nut_status, is_insufficient = ScoringEngine.calculate_nutrition_score(
             extracted["nutrition"],
@@ -228,7 +255,6 @@ async def upload_and_process_scan(
         scan.overall_status = ScanStatus.COMPLETED
 
         # Persist findings
-        persisted_findings = []
         for f in all_findings_raw:
             db_finding = Finding(
                 scan_id=scan.id,
@@ -245,9 +271,8 @@ async def upload_and_process_scan(
                 requires_manual_review=f.get("requires_manual_review", False),
             )
             db.add(db_finding)
-            persisted_findings.append(db_finding)
 
-        # 11. Generate PDF Report (REP-001, REP-004)
+        # 9. Generate Evidence-Backed PDF Report
         PDFReportGenerator.generate_pdf(
             scan_id=scan.id,
             product_name=scan.product_name or "Packaged Commodity",
@@ -257,7 +282,7 @@ async def upload_and_process_scan(
             compliance_status=comp_status.value,
             nutrition_status=nut_status.value,
             findings=all_findings_raw,
-            original_image_path=original_file_path,
+            original_image_path=primary_raw_path,
             output_pdf_path=pdf_file_path,
             created_at_str=datetime.utcnow().strftime("%d %b %Y, %H:%M UTC"),
         )
@@ -277,6 +302,7 @@ async def upload_and_process_scan(
                 "compliance_score": compliance_score,
                 "nutrition_score": nutrition_score,
                 "rule_version": rule_version.version_tag,
+                "faces_scanned": len(raw_paths),
             },
             request=request,
         )
@@ -292,6 +318,89 @@ async def upload_and_process_scan(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error occurred during OCR or compliance analysis. Original evidence is preserved.",
         )
+
+
+@router.post("/upload", response_model=ScanDetailResponse)
+async def upload_and_process_scan(
+    request: Request,
+    file: Optional[UploadFile] = File(None),
+    files: Optional[list[UploadFile]] = File(None),
+    product_name: str = Form(None),
+    brand_name: str = Form(None),
+    rule_version_tag: str = Form("LM-PC-2011-v1.0"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Upload and analyze packaging images (supports single image or multiple faces for one product).
+    """
+    upload_files = []
+    if files:
+        upload_files.extend(files)
+    if file and file not in upload_files:
+        upload_files.append(file)
+
+    if not upload_files:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No packaging image uploaded. Please provide at least one image file.",
+        )
+
+    return await _execute_scan_pipeline(
+        upload_files=upload_files,
+        product_name=product_name,
+        brand_name=brand_name,
+        rule_version_tag=rule_version_tag,
+        db=db,
+        current_user=current_user,
+        request=request,
+    )
+
+
+@router.post("/batch", response_model=BatchScanResponse)
+async def upload_batch_scans(
+    request: Request,
+    files: list[UploadFile] = File(...),
+    rule_version_tag: str = Form("LM-PC-2011-v1.0"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Batch upload multiple separate products at once.
+    Each file represents an individual product package.
+    """
+    if not files:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please provide at least one image file for batch processing.",
+        )
+
+    successful_scans = []
+    failed_uploads = []
+
+    for f in files:
+        try:
+            detail = await _execute_scan_pipeline(
+                upload_files=[f],
+                product_name=None,
+                brand_name=None,
+                rule_version_tag=rule_version_tag,
+                db=db,
+                current_user=current_user,
+                request=request,
+            )
+            successful_scans.append(detail)
+        except Exception as exc:
+            failed_uploads.append({
+                "filename": f.filename or "unknown",
+                "error": str(exc),
+            })
+
+    return {
+        "total_uploaded": len(files),
+        "successful_scans": successful_scans,
+        "failed_uploads": failed_uploads,
+    }
 
 
 @router.get("/{scan_id}", response_model=ScanDetailResponse)
@@ -340,10 +449,11 @@ def download_scan_report(
 def get_original_evidence_image(
     scan_id: str,
     request: Request,
+    index: int = 0,
     token: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
-    """Serves the preserved original evidence image (SCAN-003, SEC-007)."""
+    """Serves the preserved original evidence image by index (SCAN-003, SEC-007)."""
     scan = db.query(Scan).filter(Scan.id == scan_id).first()
     if not scan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scan not found.")
@@ -369,26 +479,46 @@ def get_original_evidence_image(
     if user and scan.user_id != user.id and user.role != UserRole.ADMINISTRATOR:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
 
-    if not scan.original_image_path or not os.path.exists(scan.original_image_path):
+    target_path = scan.original_image_path
+    if index > 0 and scan.original_image_path:
+        ev_dir = os.path.dirname(scan.original_image_path)
+        for ext in [".jpg", ".jpeg", ".png", ".webp"]:
+            candidate = os.path.join(ev_dir, f"{scan.id}_raw_{index}{ext}")
+            if os.path.exists(candidate):
+                target_path = candidate
+                break
+
+    if not target_path or not os.path.exists(target_path):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evidence image file not found.")
 
-    ext = os.path.splitext(scan.original_image_path)[1].lower()
+    ext = os.path.splitext(target_path)[1].lower()
     media_type = "image/jpeg" if ext in (".jpg", ".jpeg") else ("image/png" if ext == ".png" else "application/octet-stream")
-    return FileResponse(path=scan.original_image_path, media_type=media_type)
+    return FileResponse(path=target_path, media_type=media_type)
 
 
 @router.get("/{scan_id}/processed-image")
 def get_processed_evidence_image(
     scan_id: str,
     request: Request,
+    index: int = 0,
     token: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     """Serves the enhanced processed image (SCAN-004)."""
     scan = db.query(Scan).filter(Scan.id == scan_id).first()
-    if not scan or not scan.processed_image_path or not os.path.exists(scan.processed_image_path):
+    if not scan or not scan.processed_image_path:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Processed image not found.")
-    return FileResponse(path=scan.processed_image_path, media_type="image/png")
+
+    target_path = scan.processed_image_path
+    if index > 0 and scan.processed_image_path:
+        ev_dir = os.path.dirname(scan.processed_image_path)
+        candidate = os.path.join(ev_dir, f"{scan.id}_proc_{index}.png")
+        if os.path.exists(candidate):
+            target_path = candidate
+
+    if not os.path.exists(target_path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Processed image not found.")
+    return FileResponse(path=target_path, media_type="image/png")
 
 
 def _build_scan_detail_response(scan: Scan, rule_version: RuleVersion) -> dict:
@@ -407,6 +537,24 @@ def _build_scan_detail_response(scan: Scan, rule_version: RuleVersion) -> dict:
             bc_country = bc_meta.get("primary_barcode_country") or ("India" if str(primary_bc).startswith("890") else "International")
         elif f.field_name == "qr_code" and f.is_present:
             primary_qr = f.raw_value
+
+    # Gather all evidence faces for this scan
+    evidence_images = []
+    if scan.original_image_path and os.path.exists(scan.original_image_path):
+        evidence_images.append(f"/api/v1/scans/{scan.id}/image?index=0")
+
+    ev_dir = os.path.dirname(scan.original_image_path) if scan.original_image_path else ""
+    if ev_dir and os.path.exists(ev_dir):
+        for i in range(1, 10):
+            found = False
+            for ext in [".jpg", ".jpeg", ".png", ".webp"]:
+                candidate = os.path.join(ev_dir, f"{scan.id}_raw_{i}{ext}")
+                if os.path.exists(candidate):
+                    evidence_images.append(f"/api/v1/scans/{scan.id}/image?index={i}")
+                    found = True
+                    break
+            if not found:
+                break
 
     return {
         "id": scan.id,
@@ -435,6 +583,7 @@ def _build_scan_detail_response(scan: Scan, rule_version: RuleVersion) -> dict:
         "completed_at": scan.completed_at,
         "original_image_url": f"/api/v1/scans/{scan.id}/image",
         "processed_image_url": f"/api/v1/scans/{scan.id}/processed-image",
+        "evidence_images": evidence_images,
         "pdf_report_url": f"/api/v1/scans/{scan.id}/report",
         "rule_version_tag": rule_version.version_tag if rule_version else None,
         "fields": scan.fields,

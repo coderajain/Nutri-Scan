@@ -212,6 +212,7 @@ export const ScanResults = () => {
         <EvidenceViewer
           imageUrl={scan.original_image_url}
           processedImageUrl={scan.processed_image_url}
+          evidenceImages={scan.evidence_images}
           rawText={scan.ocr_raw_text}
           ocrConfidence={scan.ocr_confidence_avg}
         />

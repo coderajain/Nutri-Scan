@@ -1,25 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { Image as ImageIcon, FileText, Sparkles, Loader2, AlertCircle } from 'lucide-react';
+import { Image as ImageIcon, FileText, Sparkles, Loader2, AlertCircle, Layers } from 'lucide-react';
 import apiClient from '../api/client';
 
-export const EvidenceViewer = ({ imageUrl, processedImageUrl, rawText, ocrConfidence }) => {
+export const EvidenceViewer = ({
+  imageUrl,
+  processedImageUrl,
+  evidenceImages = [],
+  rawText,
+  ocrConfidence,
+}) => {
   const [activeTab, setActiveTab] = useState('image'); // 'image', 'processed', 'text'
+  const [selectedFaceIdx, setSelectedFaceIdx] = useState(0);
   const [originalBlobUrl, setOriginalBlobUrl] = useState(null);
   const [processedBlobUrl, setProcessedBlobUrl] = useState(null);
   const [loadingImg, setLoadingImg] = useState(false);
   const [imgError, setImgError] = useState(false);
+
+  // Normalize faces list
+  const faces = evidenceImages && evidenceImages.length > 0 ? evidenceImages : (imageUrl ? [imageUrl] : []);
+  const activeImageUrl = faces[selectedFaceIdx] || imageUrl;
+  const activeProcUrl = processedImageUrl
+    ? (selectedFaceIdx === 0 ? processedImageUrl : `${processedImageUrl}?index=${selectedFaceIdx}`)
+    : null;
 
   // Securely load original image with JWT token via apiClient
   useEffect(() => {
     let isMounted = true;
     let objectUrl = null;
 
-    if (imageUrl) {
+    if (activeImageUrl) {
       setLoadingImg(true);
       setImgError(false);
 
       apiClient
-        .get(imageUrl, { responseType: 'blob' })
+        .get(activeImageUrl, { responseType: 'blob' })
         .then((res) => {
           if (isMounted) {
             objectUrl = URL.createObjectURL(res.data);
@@ -30,8 +44,7 @@ export const EvidenceViewer = ({ imageUrl, processedImageUrl, rawText, ocrConfid
         .catch((err) => {
           console.warn('Failed to fetch image via blob client:', err);
           if (isMounted) {
-            // Fallback to direct URL if blob request fails
-            setOriginalBlobUrl(imageUrl);
+            setOriginalBlobUrl(activeImageUrl);
             setLoadingImg(false);
           }
         });
@@ -43,16 +56,16 @@ export const EvidenceViewer = ({ imageUrl, processedImageUrl, rawText, ocrConfid
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [imageUrl]);
+  }, [activeImageUrl]);
 
   // Load processed image if available
   useEffect(() => {
     let isMounted = true;
     let objectUrl = null;
 
-    if (processedImageUrl) {
+    if (activeProcUrl) {
       apiClient
-        .get(processedImageUrl, { responseType: 'blob' })
+        .get(activeProcUrl, { responseType: 'blob' })
         .then((res) => {
           if (isMounted) {
             objectUrl = URL.createObjectURL(res.data);
@@ -61,7 +74,7 @@ export const EvidenceViewer = ({ imageUrl, processedImageUrl, rawText, ocrConfid
         })
         .catch(() => {
           if (isMounted) {
-            setProcessedBlobUrl(processedImageUrl);
+            setProcessedBlobUrl(activeProcUrl);
           }
         });
     }
@@ -72,7 +85,7 @@ export const EvidenceViewer = ({ imageUrl, processedImageUrl, rawText, ocrConfid
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [processedImageUrl]);
+  }, [activeProcUrl]);
 
   const currentDisplayUrl = activeTab === 'processed' ? (processedBlobUrl || originalBlobUrl) : originalBlobUrl;
 
@@ -80,47 +93,70 @@ export const EvidenceViewer = ({ imageUrl, processedImageUrl, rawText, ocrConfid
     <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xs">
       {/* Tab Navigation */}
       <div className="flex flex-wrap border-b border-slate-200 bg-slate-50 px-4 py-3 justify-between items-center gap-2">
-        <div className="flex space-x-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab('image')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              activeTab === 'image'
-                ? 'bg-white text-brand-700 shadow-xs border border-slate-200'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <ImageIcon className="h-4 w-4 text-brand-600" />
-            <span>Original Evidence</span>
-          </button>
-
-          {processedImageUrl && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex space-x-1.5 bg-slate-200/60 p-1 rounded-xl">
             <button
               type="button"
-              onClick={() => setActiveTab('processed')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                activeTab === 'processed'
-                  ? 'bg-white text-purple-700 shadow-xs border border-slate-200'
+              onClick={() => setActiveTab('image')}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                activeTab === 'image'
+                  ? 'bg-white text-brand-700 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Sparkles className="h-4 w-4 text-purple-600" />
-              <span>Enhanced View</span>
+              <ImageIcon className="h-4 w-4 text-brand-600" />
+              <span>Preserved Evidence</span>
             </button>
-          )}
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('text')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              activeTab === 'text'
-                ? 'bg-white text-slate-900 shadow-xs border border-slate-200'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <FileText className="h-4 w-4 text-metrology-600" />
-            <span>Extracted OCR Text</span>
-          </button>
+            {processedImageUrl && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('processed')}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  activeTab === 'processed'
+                    ? 'bg-white text-purple-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Sparkles className="h-4 w-4 text-purple-600" />
+                <span>Enhanced View</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('text')}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                activeTab === 'text'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <FileText className="h-4 w-4 text-metrology-600" />
+              <span>Combined OCR Text</span>
+            </button>
+          </div>
+
+          {/* Multiple Faces Selector */}
+          {faces.length > 1 && (
+            <div className="flex items-center space-x-1 pl-2 border-l border-slate-200">
+              <Layers className="h-3.5 w-3.5 text-slate-400 mr-1" />
+              {faces.map((_, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setSelectedFaceIdx(idx)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                    selectedFaceIdx === idx
+                      ? 'bg-brand-600 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Face {idx + 1}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {ocrConfidence !== null && ocrConfidence !== undefined && (
@@ -137,12 +173,12 @@ export const EvidenceViewer = ({ imageUrl, processedImageUrl, rawText, ocrConfid
             {loadingImg ? (
               <div className="flex flex-col items-center space-y-2 text-slate-500">
                 <Loader2 className="h-8 w-8 animate-spin text-brand-600" />
-                <span className="text-xs font-semibold">Loading preserved evidence...</span>
+                <span className="text-xs font-semibold">Loading packaging face {selectedFaceIdx + 1}...</span>
               </div>
             ) : currentDisplayUrl && !imgError ? (
               <img
                 src={currentDisplayUrl}
-                alt={activeTab === 'processed' ? 'Enhanced Packaging Evidence' : 'Preserved Packaging Evidence'}
+                alt={activeTab === 'processed' ? `Enhanced Face ${selectedFaceIdx + 1}` : `Preserved Face ${selectedFaceIdx + 1}`}
                 onError={() => setImgError(true)}
                 className="max-h-[520px] w-auto object-contain rounded-xl shadow-sm border border-slate-200/80 bg-white"
               />

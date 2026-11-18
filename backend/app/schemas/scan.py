@@ -77,8 +77,15 @@ class ScanDetailResponse(ScanSummaryResponse):
     fields: list[ScanFieldResponse] = []
     findings: list[FindingResponse] = []
     rule_version_tag: Optional[str] = None
+    evidence_images: list[str] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class BatchScanResponse(BaseModel):
+    total_uploaded: int
+    successful_scans: list[ScanDetailResponse]
+    failed_uploads: list[dict[str, str]] = []
 
 
 class PaginatedScanHistoryResponse(BaseModel):
