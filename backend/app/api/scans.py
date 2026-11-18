@@ -18,6 +18,7 @@ from app.schemas.scan import ScanDetailResponse, ScanSummaryResponse
 from app.api.deps import get_current_user, log_audit_event
 from app.services.image_processor import ImageProcessor
 from app.services.ocr_engine import OCREngine
+from app.services.barcode_scanner import BarcodeScanner
 from app.services.field_extractor import FieldExtractor
 from app.services.compliance_engine import ComplianceEngine
 from app.services.nutrition_engine import NutritionEngine
@@ -126,9 +127,12 @@ async def upload_and_process_scan(
         # 5. Image Preprocessing (SCAN-004)
         ImageProcessor.preprocess_image(original_file_path, processed_file_path)
 
-        # 6. OCR Text Extraction (OCR-001, OCR-003)
+        # 6. Barcode & QR Code Scanning (SCAN-005, LM-004)
+        barcode_result = BarcodeScanner.scan(original_file_path)
+
+        # 7. OCR Text Extraction (OCR-001, OCR-003) using multi-pass recognition
         ocr_engine = OCREngine()
-        ocr_result = ocr_engine.extract_text(processed_file_path)
+        ocr_result = ocr_engine.extract_text(processed_file_path, raw_image_path=original_file_path)
         raw_text = ocr_result["raw_text"]
         ocr_conf = ocr_result["confidence_avg"]
         uncertainty_flags = ocr_result.get("uncertain_flags", [])
@@ -137,8 +141,27 @@ async def upload_and_process_scan(
         scan.ocr_confidence_avg = ocr_conf
         scan.uncertainty_flags = uncertainty_flags
 
-        # 7. Field Extraction (OCR-004, OCR-005, OCR-007, NUT-001, NUT-005)
+        # 8. Field Extraction (OCR-004, OCR-005, OCR-007, NUT-001, NUT-005)
         extracted = FieldExtractor.extract_all(raw_text)
+
+        # Attach detected Barcode & QR Code into declarations
+        if barcode_result.get("primary_barcode"):
+            extracted["declarations"]["barcode"] = {
+                "raw_value": barcode_result["primary_barcode"],
+                "normalized_value": f"{barcode_result['primary_barcode']} ({barcode_result.get('primary_barcode_format', 'BARCODE')}, {barcode_result.get('primary_barcode_country', '')})",
+                "unit": barcode_result.get("primary_barcode_format"),
+                "confidence": 100.0,
+                "metadata_payload": barcode_result,
+            }
+
+        if barcode_result.get("primary_qr"):
+            extracted["declarations"]["qr_code"] = {
+                "raw_value": barcode_result["primary_qr"],
+                "normalized_value": barcode_result["primary_qr"],
+                "unit": "QR",
+                "confidence": 100.0,
+                "metadata_payload": barcode_result,
+            }
 
         # If product_name was not provided by user, take from OCR
         if not scan.product_name and extracted["declarations"].get("product_name"):
@@ -150,14 +173,15 @@ async def upload_and_process_scan(
                 db_field = ScanField(
                     scan_id=scan.id,
                     field_name=field_name,
-                    field_category="declaration",
+                    field_category="declaration" if field_name not in ("barcode", "qr_code") else "identification",
                     raw_value=val_dict.get("raw_value"),
                     normalized_value=val_dict.get("normalized_value"),
                     unit=val_dict.get("unit"),
                     confidence_score=val_dict.get("confidence", ocr_conf),
                     is_present=True,
                     is_readable=True,
-                    extraction_method="regex_pattern",
+                    extraction_method="opencv_barcode" if field_name == "barcode" else ("opencv_qr" if field_name == "qr_code" else "regex_pattern"),
+                    metadata_payload=val_dict.get("metadata_payload", {}),
                 )
                 db.add(db_field)
 
@@ -333,6 +357,21 @@ def get_original_evidence_image(
 
 def _build_scan_detail_response(scan: Scan, rule_version: RuleVersion) -> dict:
     """Helper to assemble full ScanDetailResponse dictionary."""
+    primary_bc = None
+    bc_fmt = None
+    bc_country = None
+    primary_qr = None
+    bc_meta = None
+
+    for f in scan.fields:
+        if f.field_name == "barcode" and f.is_present:
+            primary_bc = f.raw_value
+            bc_meta = f.metadata_payload or {}
+            bc_fmt = bc_meta.get("primary_barcode_format") or f.unit or "EAN-13"
+            bc_country = bc_meta.get("primary_barcode_country") or ("India" if str(primary_bc).startswith("890") else "International")
+        elif f.field_name == "qr_code" and f.is_present:
+            primary_qr = f.raw_value
+
     return {
         "id": scan.id,
         "user_id": scan.user_id,
@@ -350,6 +389,11 @@ def _build_scan_detail_response(scan: Scan, rule_version: RuleVersion) -> dict:
         "ocr_confidence_avg": scan.ocr_confidence_avg,
         "ocr_raw_text": scan.ocr_raw_text,
         "uncertainty_flags": scan.uncertainty_flags or [],
+        "barcode": primary_bc,
+        "barcode_format": bc_fmt,
+        "barcode_country": bc_country,
+        "qr_code": primary_qr,
+        "barcode_metadata": bc_meta,
         "scan_duration_ms": scan.scan_duration_ms,
         "created_at": scan.created_at,
         "completed_at": scan.completed_at,

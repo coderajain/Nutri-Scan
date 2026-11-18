@@ -5,7 +5,7 @@ import { ScoreCards } from '../components/ScoreCards';
 import { EvidenceViewer } from '../components/EvidenceViewer';
 import { FindingBadge, SeverityBadge } from '../components/StatusBadges';
 import { Disclaimers } from '../components/Disclaimers';
-import { Download, ArrowLeft, Clock, ShieldCheck, CheckCircle2, AlertTriangle, Eye, Table } from 'lucide-react';
+import { Download, ArrowLeft, Clock, ShieldCheck, CheckCircle2, AlertTriangle, Eye, Table, Barcode, QrCode, ExternalLink } from 'lucide-react';
 
 export const ScanResults = () => {
   const { id } = useParams();
@@ -135,6 +135,76 @@ export const ScanResults = () => {
         isDataInsufficient={scan.is_data_insufficient}
         hasFontSizeFlags={scan.has_font_size_flags}
       />
+
+      {/* Barcode & QR Code Section (SCAN-005, LM-004) */}
+      <div className="my-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* 1D Barcode Card */}
+        <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs flex items-start space-x-4">
+          <div className={`p-3 rounded-2xl shrink-0 ${scan.barcode ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-slate-50 text-slate-400'}`}>
+            <Barcode className="h-6 w-6" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center space-x-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Packaging Barcode (GTIN)</h3>
+              {scan.barcode && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">
+                  Detected
+                </span>
+              )}
+            </div>
+            {scan.barcode ? (
+              <div className="mt-1.5">
+                <p className="text-xl font-mono font-black text-slate-900 tracking-wider">{scan.barcode}</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Format: <span className="font-semibold text-slate-700">{scan.barcode_format || 'EAN-13'}</span>
+                  {scan.barcode_country && (
+                    <> &bull; Origin: <span className="font-semibold text-indigo-700">{scan.barcode_country}</span></>
+                  )}
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 italic mt-1.5">No 1D barcode detected on this packaging view</p>
+            )}
+          </div>
+        </div>
+
+        {/* 2D QR Code Card */}
+        <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs flex items-start space-x-4">
+          <div className={`p-3 rounded-2xl shrink-0 ${scan.qr_code ? 'bg-purple-50 text-purple-600 border border-purple-100' : 'bg-slate-50 text-slate-400'}`}>
+            <QrCode className="h-6 w-6" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center space-x-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Smart QR Code</h3>
+              {scan.qr_code && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">
+                  Decoded
+                </span>
+              )}
+            </div>
+            {scan.qr_code ? (
+              <div className="mt-1.5">
+                <p className="text-xs font-mono text-slate-800 break-all bg-slate-50 p-2 rounded-xl border border-slate-200">
+                  {scan.qr_code}
+                </p>
+                {scan.qr_code.startsWith('http') && (
+                  <a
+                    href={scan.qr_code}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center space-x-1 text-xs font-bold text-purple-600 hover:text-purple-800 mt-1.5 transition"
+                  >
+                    <span>Open Regulatory / Traceability Link</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 italic mt-1.5">No 2D QR code detected on this packaging view</p>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Evidence Viewer (Original Image + Raw OCR Text) */}
       <div className="my-8">

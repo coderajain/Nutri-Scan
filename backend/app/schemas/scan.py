@@ -69,6 +69,11 @@ class ScanDetailResponse(ScanSummaryResponse):
     pdf_report_url: Optional[str] = None
     ocr_raw_text: Optional[str] = None
     uncertainty_flags: list[Any] = []
+    barcode: Optional[str] = None
+    barcode_format: Optional[str] = None
+    barcode_country: Optional[str] = None
+    qr_code: Optional[str] = None
+    barcode_metadata: Optional[dict[str, Any]] = None
     fields: list[ScanFieldResponse] = []
     findings: list[FindingResponse] = []
     rule_version_tag: Optional[str] = None

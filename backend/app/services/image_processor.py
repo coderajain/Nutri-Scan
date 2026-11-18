@@ -55,22 +55,23 @@ class ImageProcessor:
         # 2. Grayscale conversion
         gray = cv2.cvtColor(img_resized, cv2.COLOR_BGR2GRAY)
 
-        # 3. CLAHE Contrast Enhancement
-        clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
+        # 3. CLAHE Contrast Enhancement (sharpens letters on low-contrast food packaging)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         contrast_enhanced = clahe.apply(gray)
 
-        # 4. Bilateral filter for noise reduction without blurring text edges
-        denoised = cv2.bilateralFilter(contrast_enhanced, d=9, sigmaColor=75, sigmaSpace=75)
+        # 4. Bilateral filter: removes packaging noise/glare while preserving sharp text edges
+        denoised = cv2.bilateralFilter(contrast_enhanced, d=7, sigmaColor=50, sigmaSpace=50)
 
         # 5. Deskewing
         deskewed, angle = cls._deskew(denoised)
 
-        # 6. Adaptive Thresholding (Otsu thresholding for crisp text characters)
-        _, thresh = cv2.threshold(deskewed, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        # Ensure destination directory exists safely
+        out_dir = os.path.dirname(output_path)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
 
-        # Ensure destination directory exists
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        cv2.imwrite(output_path, thresh)
+        # Save enhanced grayscale image (preserves antialiased font edges for Tesseract LSTM neural net)
+        cv2.imwrite(output_path, deskewed)
 
         logger.info(f"Processed image saved to {output_path} (Rotation applied: {angle:.2f}°)")
 
@@ -85,27 +86,31 @@ class ImageProcessor:
 
     @staticmethod
     def _deskew(image: np.ndarray) -> tuple[np.ndarray, float]:
-        """Calculates skew angle and rotates the image horizontally."""
-        # Find coordinates of all non-zero pixels
-        coords = np.column_stack(np.where(image > 0))
-        if coords.shape[0] < 50:
+        """Calculates skew angle from text edge contours and rotates the image horizontally."""
+        try:
+            edges = cv2.Canny(image, 50, 150, apertureSize=3)
+            coords = np.column_stack(np.where(edges > 0))
+            if coords.shape[0] < 100:
+                return image, 0.0
+
+            angle = cv2.minAreaRect(coords)[-1]
+            if angle < -45:
+                angle = -(90 + angle)
+            elif angle > 45:
+                angle = -(angle - 90)
+            else:
+                angle = -angle
+
+            # Only apply subtle rotation correction between 0.5 and 15 degrees
+            if abs(angle) < 0.5 or abs(angle) > 15:
+                return image, 0.0
+
+            (h, w) = image.shape[:2]
+            center = (w // 2, h // 2)
+            M = cv2.getRotationMatrix2D(center, angle, 1.0)
+            rotated = cv2.warpAffine(
+                image, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE
+            )
+            return rotated, angle
+        except Exception:
             return image, 0.0
-
-        angle = cv2.minAreaRect(coords)[-1]
-        # In OpenCV minAreaRect returns angle in [-90, 0)
-        if angle < -45:
-            angle = -(90 + angle)
-        else:
-            angle = -angle
-
-        # If angle is minimal, skip rotation to avoid interpolation artifacts
-        if abs(angle) < 0.5 or abs(angle) > 45:
-            return image, 0.0
-
-        (h, w) = image.shape[:2]
-        center = (w // 2, h // 2)
-        M = cv2.getRotationMatrix2D(center, angle, 1.0)
-        rotated = cv2.warpAffine(
-            image, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE
-        )
-        return rotated, angle
