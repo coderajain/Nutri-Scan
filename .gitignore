@@ -70,3 +70,8 @@ backend/nutriscan.db
 # Test & coverage
 *.coverage
 .tox/
+
+# Debug and local testing
+debug_output/
+debug_*
+verify_*.py

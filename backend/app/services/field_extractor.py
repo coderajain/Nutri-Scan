@@ -60,27 +60,42 @@ class FieldExtractor:
     def _clean_text(text: str) -> str:
         """Normalizes unicode whitespace, currency symbols, and line breaks."""
         text = text.replace("\r\n", "\n").replace("\r", "\n")
-        # Replace common OCR misreadings of Rupee symbol
-        text = re.sub(r'[₹|`]\s*', '₹ ', text)
+        # Replace common OCR misreadings of Rupee symbol (do not replace pipe |)
+        text = re.sub(r'[₹`]\s*', '₹ ', text)
         return text
 
     @classmethod
     def _extract_product_name(cls, text: str) -> Optional[dict]:
-        """Extracts brand or product name from top lines."""
+        """Extracts brand or product name, prioritizing clear product descriptors."""
         lines = [line.strip() for line in text.split("\n") if len(line.strip()) > 3]
         if not lines:
             return None
-        # Heuristic: the top prominent line that isn't a date, license, or address
-        for line in lines[:8]:
+
+        # Look for explicit food/drink names or prominent non-metadata lines
+        candidates = []
+        for line in lines:
             if line.startswith(("-", "=", "*", "#")) or "packaging face" in line.lower():
                 continue
-            if not re.search(r'(fssai|lic|mrp|mfg|exp|batch|net qty|regd|address|pvt|ltd)', line, re.IGNORECASE):
-                if len(line) <= 60:
+            # Skip dates, timestamps, batch numbers, licenses, instructions, and addresses
+            if re.match(r'^\d', line) or re.search(r'(\d{2}/\d{2}/\d{2,4}|:\d{2}|usp|shake|drink|fssai|lic|mrp|mfg|exp|batch|lot|net qty|regd|address|pvt|ltd|keep your|city clean|consumer)', line, re.IGNORECASE):
+                continue
+            if 4 <= len(line) <= 60:
+                # High priority if it has product words (milk, beverage, snack, chips, chocolate, etc.)
+                if re.search(r'(milk|flavoured|chocolate|hazelnut|shake|drink|juice|biscuit|cookie|tea|coffee|oil|water)', line, re.IGNORECASE):
                     return {
                         "raw_value": line,
                         "normalized_value": line.title(),
-                        "confidence": 85.0,
+                        "confidence": 95.0,
                     }
+                candidates.append(line)
+
+        if candidates:
+            chosen = candidates[0]
+            return {
+                "raw_value": chosen,
+                "normalized_value": chosen.title(),
+                "confidence": 85.0,
+            }
         return None
 
     @classmethod
@@ -140,6 +155,15 @@ class FieldExtractor:
                 "unit": "INR",
                 "confidence": 90.0,
             }
+        # Fallback: price on dot-matrix stamp (e.g. 'AP26283 20.00' or '₹20.00')
+        fallback = re.search(r'(?:[A-Z0-9]{5,10}\s+(?:₹\s*)?|₹\s*)(\d{2}\.\d{2})\b', text)
+        if fallback:
+            return {
+                "raw_value": fallback.group(0).strip(),
+                "normalized_value": f"₹{fallback.group(1)}",
+                "unit": "INR",
+                "confidence": 85.0,
+            }
         return None
 
     @classmethod
@@ -164,10 +188,27 @@ class FieldExtractor:
         pattern = r'(?:best\s*before|use\s*by|exp(?:iry)?(?:\s*date)?|bbd)[\s\.:\-_]+([A-Za-z0-9\/\.\-\s]{3,20})'
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
+            val = match.group(1).strip()
+            # If line is generic reference like "REFER TO BODY", check for actual date stamp below
+            if not re.search(r'refer', val, re.IGNORECASE):
+                return {
+                    "raw_value": match.group(0).strip(),
+                    "normalized_value": val,
+                    "confidence": 88.0,
+                }
+        # Fallback: scan for standalone date stamps (e.g. 07/04/27)
+        dates = re.findall(r'\b(\d{2}/\d{2}/\d{2,4})\b', text)
+        if len(dates) >= 2:
             return {
-                "raw_value": match.group(0).strip(),
-                "normalized_value": match.group(1).strip(),
-                "confidence": 88.0,
+                "raw_value": dates[1],
+                "normalized_value": dates[1],
+                "confidence": 85.0,
+            }
+        elif len(dates) == 1 and not re.search(r'mfg|pkd', text, re.IGNORECASE):
+            return {
+                "raw_value": dates[0],
+                "normalized_value": dates[0],
+                "confidence": 80.0,
             }
         return None
 
@@ -177,10 +218,19 @@ class FieldExtractor:
         pattern = r'(?:mfg(?:\s*date)?|manufactured\s*on|pkd|packed(?:\s*on)?)[\s\.:\-_]+([A-Za-z0-9\/\.\-\s]{3,20})'
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
+            val = match.group(1).strip()
+            if not re.search(r'refer', val, re.IGNORECASE):
+                return {
+                    "raw_value": match.group(0).strip(),
+                    "normalized_value": val,
+                    "confidence": 88.0,
+                }
+        dates = re.findall(r'\b(\d{2}/\d{2}/\d{2,4})\b', text)
+        if dates:
             return {
-                "raw_value": match.group(0).strip(),
-                "normalized_value": match.group(1).strip(),
-                "confidence": 88.0,
+                "raw_value": dates[0],
+                "normalized_value": dates[0],
+                "confidence": 85.0,
             }
         return None
 
@@ -190,9 +240,19 @@ class FieldExtractor:
         pattern = r'(?:batch\s*(?:no\.?|code|#)?|lot\s*(?:no\.?|#)?|b\.?\s*no\.?)[\s\.:\-_]+([A-Za-z0-9\-_]{3,20})'
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
+            val = match.group(1).strip()
+            if not re.search(r'refer', val, re.IGNORECASE):
+                return {
+                    "raw_value": match.group(0).strip(),
+                    "normalized_value": val,
+                    "confidence": 85.0,
+                }
+        # Fallback: batch code format on package (e.g. 'AP26283' or 'BHP26283')
+        fallback = re.search(r'\b([A-Z]{1,3}\d{4,8})\b', text)
+        if fallback:
             return {
-                "raw_value": match.group(0).strip(),
-                "normalized_value": match.group(1).strip(),
+                "raw_value": fallback.group(0).strip(),
+                "normalized_value": fallback.group(1).strip(),
                 "confidence": 85.0,
             }
         return None
@@ -297,16 +357,16 @@ class FieldExtractor:
         Never defaulted to 0.
         """
         nutrition_specs = [
-            ("energy_kcal", r'(?:energy|calories)[\s\.:\-_]*(\d+(?:\.\d+)?)\s*(?:kcal|cal)?', "kcal"),
-            ("protein_g", r'protein[\s\.:\-_]*(\d+(?:\.\d+)?)\s*(?:g|gm)?', "g"),
-            ("carbohydrate_g", r'(?:carbohydrates?|carb)[\s\.:\-_]*(\d+(?:\.\d+)?)\s*(?:g|gm)?', "g"),
-            ("total_sugars_g", r'(?:total\s*sugars?|sugars?)[\s\.:\-_]*(\d+(?:\.\d+)?)\s*(?:g|gm)?', "g"),
-            ("added_sugars_g", r'added\s*sugars?[\s\.:\-_]*(\d+(?:\.\d+)?)\s*(?:g|gm)?', "g"),
-            ("total_fat_g", r'(?:total\s*fat|fat)[\s\.:\-_]*(\d+(?:\.\d+)?)\s*(?:g|gm)?', "g"),
-            ("saturated_fat_g", r'(?:saturated\s*fat|sat\s*fat)[\s\.:\-_]*(\d+(?:\.\d+)?)\s*(?:g|gm)?', "g"),
-            ("trans_fat_g", r'trans\s*fat[\s\.:\-_]*(\d+(?:\.\d+)?)\s*(?:g|gm)?', "g"),
-            ("sodium_mg", r'sodium[\s\.:\-_]*(\d+(?:\.\d+)?)\s*(?:mg)?', "mg"),
-            ("dietary_fiber_g", r'(?:dietary\s*fiber|fiber)[\s\.:\-_]*(\d+(?:\.\d+)?)\s*(?:g|gm)?', "g"),
+            ("energy_kcal", r'(?:energy|calories)[\s\.:\-_|]*(?:\([a-z]+\))?[\s\.:\-_|]*(\d+(?:\.\d+)?)\s*(?:kcal|cal)?', "kcal"),
+            ("protein_g", r'protein[\s\.:\-_|]*(?:\([a-z]+\))?[\s\.:\-_|]*(\d+(?:\.\d+)?)\s*(?:g|gm)?', "g"),
+            ("carbohydrate_g", r'(?:carbohydrates?|carb)[\s\.:\-_|]*(?:\([a-z]+\))?[\s\.:\-_|]*(\d+(?:\.\d+)?)\s*(?:g|gm)?', "g"),
+            ("total_sugars_g", r'(?:total\s*sugars?|sugars?)[\s\.:\-_|]*(?:\([a-z]+\))?[\s\.:\-_|]*(\d+(?:\.\d+)?)\s*(?:g|gm)?', "g"),
+            ("added_sugars_g", r'added\s*sugars?[\s\.:\-_|]*(?:\([a-z]+\))?[\s\.:\-_|]*(\d+(?:\.\d+)?)\s*(?:g|gm)?', "g"),
+            ("total_fat_g", r'(?:total\s*fat|fat)[\s\.:\-_|]*(?:\([a-z]+\))?[\s\.:\-_|]*(\d+(?:\.\d+)?)\s*(?:g|gm)?', "g"),
+            ("saturated_fat_g", r'(?:saturated\s*fat|sat\s*fat)[\s\.:\-_|]*(?:\([a-z]+\))?[\s\.:\-_|]*(\d+(?:\.\d+)?)\s*(?:g|gm)?', "g"),
+            ("trans_fat_g", r'trans\s*fat[\s\.:\-_|]*(?:\([a-z]+\))?[\s\.:\-_|]*(\d+(?:\.\d+)?)\s*(?:g|gm)?', "g"),
+            ("sodium_mg", r'sodium[\s\.:\-_|]*(?:\([a-z]+\))?[\s\.:\-_|]*(\d+(?:\.\d+)?)\s*(?:mg)?', "mg"),
+            ("dietary_fiber_g", r'(?:dietary\s*fiber|fiber)[\s\.:\-_|]*(?:\([a-z]+\))?[\s\.:\-_|]*(\d+(?:\.\d+)?)\s*(?:g|gm)?', "g"),
         ]
 
         result = {}
@@ -330,7 +390,7 @@ class FieldExtractor:
     @classmethod
     def _extract_ingredients_list(cls, text: str) -> list[str]:
         """Extracts ingredients and parses into comma-separated normalized items."""
-        pattern = r'(?:ingredients|contains)[\s\.:\-_]+([A-Za-z0-9\s,\.\(\)%-]+?)(?:\n\n|\bmanufactured\b|\bmrp\b|\bfssai\b|\bnet\b|$)'
+        pattern = r'(?:ingredients|contains)[\s\.:\-_]+([A-Za-z0-9\s,\.\(\)%-]+?)(?:\n\n|\bmanufactured\b|\bmrp\b|\bfssai\b|\bnet\b|\bnutritional\b|\ballergen\b|$)'
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
             ing_block = match.group(1).strip()

@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, ScanLine, LayoutDashboard, History, Settings, LogOut, User } from 'lucide-react';
+import { ScanLine, LayoutDashboard, History, Settings, LogOut, User } from 'lucide-react';
+import logo from '../assets/logo.png';
 
 export const Navbar = () => {
   const { user, logout, isAdmin } = useAuth();
@@ -21,17 +22,19 @@ export const Navbar = () => {
         <div className="flex justify-between h-16 items-center">
           {/* Brand Logo & Academic Badge */}
           <div className="flex items-center space-x-3">
-            <Link to="/" className="flex items-center space-x-2">
-              <div className="bg-brand-600 text-white p-2 rounded-xl shadow-sm">
-                <ShieldCheck className="h-6 w-6" />
-              </div>
-              <div className="flex flex-col">
-                <span className="font-extrabold text-xl tracking-tight text-slate-900">
-                  Nutri<span className="text-brand-600">Scan</span>
-                  <span className="text-xs ml-1.5 px-2 py-0.5 font-semibold bg-slate-100 text-slate-600 rounded-full border border-slate-200">v1.0</span>
-                </span>
-                <span className="text-[10px] text-slate-500 font-medium hidden sm:inline">
-                  Food Safety & Legal Metrology Screening
+            <Link to="/" className="flex items-center space-x-3 group">
+              <img
+                src={logo}
+                alt="NutriScan Logo"
+                className="h-9 w-auto object-contain transition-transform group-hover:scale-105"
+              />
+              <div className="hidden sm:flex flex-col border-l border-slate-200 pl-3">
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-[11px] font-bold tracking-wide uppercase text-slate-700">Audit & Screening</span>
+                  <span className="text-[10px] px-1.5 py-0.2 font-semibold bg-emerald-50 text-emerald-700 rounded border border-emerald-200">v1.0</span>
+                </div>
+                <span className="text-[10px] text-slate-400 font-medium">
+                  Food Safety & Legal Metrology
                 </span>
               </div>
             </Link>

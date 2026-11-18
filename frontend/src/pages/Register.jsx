@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, Lock, Mail, User, AlertCircle, ArrowRight } from 'lucide-react';
+import { Lock, Mail, User, AlertCircle, ArrowRight } from 'lucide-react';
+import logo from '../assets/logo.png';
 
 export const Register = () => {
   const [fullName, setFullName] = useState('');
@@ -35,10 +36,12 @@ export const Register = () => {
     <div className="min-h-[85vh] flex items-center justify-center px-4 sm:px-6 lg:px-8 py-12">
       <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
         <div className="text-center">
-          <div className="mx-auto h-12 w-12 bg-brand-50 border border-brand-200 text-brand-600 rounded-2xl flex items-center justify-center shadow-xs">
-            <ShieldCheck className="h-7 w-7" />
+          <div className="flex justify-center mb-5">
+            <Link to="/" className="inline-block">
+              <img src={logo} alt="NutriScan Logo" className="h-12 w-auto object-contain hover:opacity-90 transition" />
+            </Link>
           </div>
-          <h2 className="mt-4 text-2xl font-black text-slate-900 tracking-tight">Create NutriScan Account</h2>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight">Create your account</h2>
           <p className="mt-1 text-xs text-slate-500">
             Sign up to scan and evaluate packaged food labels
           </p>
