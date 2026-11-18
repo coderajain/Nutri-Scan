@@ -109,27 +109,27 @@ export const ScanUpload = () => {
       if (brandName) formData.append('brand_name', brandName);
 
       setProcessingStage(`1/4: Enhancing ${files.length} packaging view${files.length > 1 ? 's' : ''} with OpenCV & CLAHE...`);
-      setProgressPct(20);
+      setProgressPct(25);
 
       const timer1 = setTimeout(() => {
         setProcessingStage('2/4: Scanning 1D/2D Barcodes, GS1 prefixes & QR codes...');
-        setProgressPct(45);
-      }, 1200);
+        setProgressPct(50);
+      }, 700);
 
       const timer2 = setTimeout(() => {
-        setProcessingStage('3/4: Deep learning OCR text recognition & label field extraction...');
-        setProgressPct(70);
-      }, 2800);
+        setProcessingStage('3/4: High-speed OCR text recognition & field extraction...');
+        setProgressPct(75);
+      }, 1500);
 
       const timer3 = setTimeout(() => {
         setProcessingStage('4/4: Evaluating Legal Metrology rules & generating audit PDF...');
-        setProgressPct(88);
-      }, 4800);
+        setProgressPct(90);
+      }, 2500);
 
       const timer4 = setTimeout(() => {
-        setProcessingStage('Finalizing compliance verification and compiling report...');
+        setProcessingStage('Compiling final compliance report...');
         setProgressPct(95);
-      }, 7500);
+      }, 4000);
 
       try {
         const res = await apiClient.post('/scans/upload', formData, {

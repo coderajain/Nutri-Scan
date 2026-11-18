@@ -38,14 +38,6 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.error(f"Seeding error during startup: {exc}")
 
-    # 3. Warm up OCR engine in background thread to eliminate first-request cold-start latency
-    try:
-        import threading
-        from app.services.ocr_engine import get_paddle_ocr
-        threading.Thread(target=get_paddle_ocr, daemon=True, name="PaddleOCR-Warmup").start()
-    except Exception as exc:
-        logger.debug(f"OCR warm-up non-critical error: {exc}")
-
     yield
 
     logger.info(f"Shutting down {settings.APP_NAME}")

@@ -21,6 +21,10 @@ def preprocess_for_tesseract(input_path: str, output_path: str, debug_dir: str =
         raise ValueError(f"Could not read image at: {input_path}")
 
     h, w = img.shape[:2]
+    if max(h, w) > 1800:
+        scale = 1800.0 / max(h, w)
+        img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+        h, w = img.shape[:2]
 
     # 1. Crop out the extreme curved left/right 10% margins
     x_start = int(0.10 * w)
