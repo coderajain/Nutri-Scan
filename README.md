@@ -170,7 +170,16 @@ cd Nutri-Scan
 cp .env.example .env
 ```
 
-### 2. Launch with Docker Compose
+### 2. Launch Services
+
+#### Option A: One-Click Local Launch (Windows)
+Double-click `start.bat` or run in PowerShell:
+```powershell
+.\start.ps1
+```
+This automatically starts both the FastAPI backend and React frontend in separate titled console windows. To stop both services, run `stop.bat`.
+
+#### Option B: Launch with Docker Compose
 ```bash
 docker-compose up --build -d
 ```
