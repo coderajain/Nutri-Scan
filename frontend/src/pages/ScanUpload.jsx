@@ -26,6 +26,7 @@ export const ScanUpload = () => {
   const [ruleVersions, setRuleVersions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [processingStage, setProcessingStage] = useState('');
+  const [progressPct, setProgressPct] = useState(0);
   const [error, setError] = useState('');
   const [batchResults, setBatchResults] = useState(null);
   const navigate = useNavigate();
@@ -107,16 +108,28 @@ export const ScanUpload = () => {
       if (productName) formData.append('product_name', productName);
       if (brandName) formData.append('brand_name', brandName);
 
-      setProcessingStage(`1/4: Analyzing ${files.length} packaging view${files.length > 1 ? 's' : ''} with OpenCV & CLAHE...`);
+      setProcessingStage(`1/4: Enhancing ${files.length} packaging view${files.length > 1 ? 's' : ''} with OpenCV & CLAHE...`);
+      setProgressPct(20);
+
       const timer1 = setTimeout(() => {
-        setProcessingStage('2/4: Detecting 1D/2D Barcodes, GS1 prefixes & QR codes...');
-      }, 1500);
+        setProcessingStage('2/4: Scanning 1D/2D Barcodes, GS1 prefixes & QR codes...');
+        setProgressPct(45);
+      }, 1200);
+
       const timer2 = setTimeout(() => {
-        setProcessingStage('3/4: Multi-pass Tesseract OCR text recognition & label field parsing...');
-      }, 3500);
+        setProcessingStage('3/4: Deep learning OCR text recognition & label field extraction...');
+        setProgressPct(70);
+      }, 2800);
+
       const timer3 = setTimeout(() => {
-        setProcessingStage('4/4: Evaluating Legal Metrology statutory rules and compiling PDF...');
-      }, 5500);
+        setProcessingStage('4/4: Evaluating Legal Metrology rules & generating audit PDF...');
+        setProgressPct(88);
+      }, 4800);
+
+      const timer4 = setTimeout(() => {
+        setProcessingStage('Finalizing compliance verification and compiling report...');
+        setProgressPct(95);
+      }, 7500);
 
       try {
         const res = await apiClient.post('/scans/upload', formData, {
@@ -125,21 +138,27 @@ export const ScanUpload = () => {
         clearTimeout(timer1);
         clearTimeout(timer2);
         clearTimeout(timer3);
+        clearTimeout(timer4);
+        setProgressPct(100);
+        setProcessingStage('Analysis complete! Redirecting to audit report...');
         navigate(`/scan/${res.data.id}`);
       } catch (err) {
         clearTimeout(timer1);
         clearTimeout(timer2);
         clearTimeout(timer3);
+        clearTimeout(timer4);
         setError(err.response?.data?.detail || 'Multi-view scan failed. Please check image quality.');
         setLoading(false);
       }
     } else {
       // Batch mode
       setProcessingStage(`Batch auditing ${files.length} individual packaged products...`);
+      setProgressPct(50);
       try {
         const res = await apiClient.post('/scans/batch', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
+        setProgressPct(100);
         setBatchResults(res.data);
         setLoading(false);
       } catch (err) {
@@ -259,9 +278,18 @@ export const ScanUpload = () => {
           <h3 className="mt-6 text-lg font-bold text-slate-900">
             {uploadMode === 'multi_face' ? 'Processing Multi-View Package Audit' : 'Executing Batch Product Analysis'}
           </h3>
-          <p className="mt-2 text-xs font-medium text-slate-500 animate-pulse">{processingStage}</p>
-          <div className="mt-6 max-w-xs mx-auto bg-slate-100 rounded-full h-2 overflow-hidden">
-            <div className="bg-brand-600 h-full w-2/3 animate-pulse"></div>
+          <p className="mt-2 text-xs font-medium text-slate-600 animate-pulse">{processingStage}</p>
+          <div className="mt-6 max-w-sm mx-auto">
+            <div className="bg-slate-100 rounded-full h-2.5 overflow-hidden">
+              <div
+                className="bg-brand-600 h-full transition-all duration-500 ease-out rounded-full"
+                style={{ width: `${progressPct}%` }}
+              ></div>
+            </div>
+            <div className="flex justify-between items-center mt-2 text-[10px] text-slate-400 font-semibold px-1">
+              <span>Auditing</span>
+              <span>{progressPct}%</span>
+            </div>
           </div>
         </div>
       ) : (
