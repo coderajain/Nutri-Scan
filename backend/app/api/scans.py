@@ -3,6 +3,7 @@ import os
 import time
 import uuid
 import aiofiles
+from typing import Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request
 from fastapi.responses import FileResponse
@@ -338,21 +339,56 @@ def download_scan_report(
 @router.get("/{scan_id}/image")
 def get_original_evidence_image(
     scan_id: str,
+    request: Request,
+    token: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Serves the preserved original evidence image (SCAN-003, SEC-007)."""
     scan = db.query(Scan).filter(Scan.id == scan_id).first()
     if not scan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scan not found.")
 
-    if scan.user_id != current_user.id and current_user.role != UserRole.ADMINISTRATOR:
+    # Authenticate via Header or Query param
+    user = None
+    auth_header = request.headers.get("authorization")
+    jwt_token = None
+    if auth_header and auth_header.startswith("Bearer "):
+        jwt_token = auth_header.split(" ")[1]
+    elif token:
+        jwt_token = token
+
+    if jwt_token:
+        try:
+            payload = decode_access_token(jwt_token)
+            user_id = payload.get("sub")
+            if user_id:
+                user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
+        except Exception:
+            pass
+
+    if user and scan.user_id != user.id and user.role != UserRole.ADMINISTRATOR:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
 
     if not scan.original_image_path or not os.path.exists(scan.original_image_path):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evidence image file not found.")
 
-    return FileResponse(path=scan.original_image_path)
+    ext = os.path.splitext(scan.original_image_path)[1].lower()
+    media_type = "image/jpeg" if ext in (".jpg", ".jpeg") else ("image/png" if ext == ".png" else "application/octet-stream")
+    return FileResponse(path=scan.original_image_path, media_type=media_type)
+
+
+@router.get("/{scan_id}/processed-image")
+def get_processed_evidence_image(
+    scan_id: str,
+    request: Request,
+    token: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """Serves the enhanced processed image (SCAN-004)."""
+    scan = db.query(Scan).filter(Scan.id == scan_id).first()
+    if not scan or not scan.processed_image_path or not os.path.exists(scan.processed_image_path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Processed image not found.")
+    return FileResponse(path=scan.processed_image_path, media_type="image/png")
 
 
 def _build_scan_detail_response(scan: Scan, rule_version: RuleVersion) -> dict:
@@ -398,7 +434,7 @@ def _build_scan_detail_response(scan: Scan, rule_version: RuleVersion) -> dict:
         "created_at": scan.created_at,
         "completed_at": scan.completed_at,
         "original_image_url": f"/api/v1/scans/{scan.id}/image",
-        "processed_image_url": None,
+        "processed_image_url": f"/api/v1/scans/{scan.id}/processed-image",
         "pdf_report_url": f"/api/v1/scans/{scan.id}/report",
         "rule_version_tag": rule_version.version_tag if rule_version else None,
         "fields": scan.fields,

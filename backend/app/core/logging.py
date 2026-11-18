@@ -6,9 +6,9 @@ from app.core.config import settings
 
 # Sensitive tokens/passwords filter to prevent logging in plaintext (SEC-002)
 SENSITIVE_PATTERNS = [
-    re.compile(r'(password[\'\"]?\s*[:=]\s*[\'\"]?)([^\'\"]+)([\'\"]?)', re.IGNORECASE),
-    re.compile(r'(token[\'\"]?\s*[:=]\s*[\'\"]?)([^\'\"]+)([\'\"]?)', re.IGNORECASE),
-    re.compile(r'(Bearer\s+)([A-Za-z0-9\-_\.]+)', re.IGNORECASE),
+    (re.compile(r'(password[\'\"]?\s*[:=]\s*[\'\"]?)([^\'\"]+)([\'\"]?)', re.IGNORECASE), r'\1[REDACTED]\3'),
+    (re.compile(r'(token[\'\"]?\s*[:=]\s*[\'\"]?)([^\'\"]+)([\'\"]?)', re.IGNORECASE), r'\1[REDACTED]\3'),
+    (re.compile(r'(Bearer\s+)([A-Za-z0-9\-_\.]+)', re.IGNORECASE), r'\1[REDACTED]'),
 ]
 
 
@@ -16,8 +16,8 @@ class SanitizingFormatter(logging.Formatter):
     """Custom formatter that redacts passwords and bearer tokens."""
     def format(self, record: logging.LogRecord) -> str:
         original = super().format(record)
-        for pattern in SENSITIVE_PATTERNS:
-            original = pattern.sub(r'\1[REDACTED]\3', original)
+        for pattern, replacement in SENSITIVE_PATTERNS:
+            original = pattern.sub(replacement, original)
         return original
 
 

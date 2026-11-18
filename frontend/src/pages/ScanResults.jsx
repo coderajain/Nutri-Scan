@@ -211,6 +211,7 @@ export const ScanResults = () => {
         <h2 className="text-base font-extrabold text-slate-900 mb-3">Preserved Packaging Evidence (SCAN-003)</h2>
         <EvidenceViewer
           imageUrl={scan.original_image_url}
+          processedImageUrl={scan.processed_image_url}
           rawText={scan.ocr_raw_text}
           ocrConfidence={scan.ocr_confidence_avg}
         />
