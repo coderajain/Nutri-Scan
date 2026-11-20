@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Image as ImageIcon, FileText, Sparkles, Loader2, AlertCircle, Layers } from 'lucide-react';
-import apiClient from '../api/client';
+import apiClient, { getFullMediaUrl } from '../api/client';
 
 export const EvidenceViewer = ({
   imageUrl,
@@ -32,8 +32,13 @@ export const EvidenceViewer = ({
       setLoadingImg(true);
       setImgError(false);
 
+      // Strip leading /api/v1 if present to avoid duplicate paths with apiClient baseURL
+      const requestUrl = activeImageUrl.startsWith('/api/v1/')
+        ? activeImageUrl.replace(/^\/api\/v1/, '')
+        : activeImageUrl;
+
       apiClient
-        .get(activeImageUrl, { responseType: 'blob' })
+        .get(requestUrl, { responseType: 'blob' })
         .then((res) => {
           if (isMounted) {
             objectUrl = URL.createObjectURL(res.data);
@@ -44,7 +49,7 @@ export const EvidenceViewer = ({
         .catch((err) => {
           console.warn('Failed to fetch image via blob client:', err);
           if (isMounted) {
-            setOriginalBlobUrl(activeImageUrl);
+            setOriginalBlobUrl(getFullMediaUrl ? getFullMediaUrl(activeImageUrl) : activeImageUrl);
             setLoadingImg(false);
           }
         });
@@ -64,8 +69,12 @@ export const EvidenceViewer = ({
     let objectUrl = null;
 
     if (activeProcUrl) {
+      const requestProcUrl = activeProcUrl.startsWith('/api/v1/')
+        ? activeProcUrl.replace(/^\/api\/v1/, '')
+        : activeProcUrl;
+
       apiClient
-        .get(activeProcUrl, { responseType: 'blob' })
+        .get(requestProcUrl, { responseType: 'blob' })
         .then((res) => {
           if (isMounted) {
             objectUrl = URL.createObjectURL(res.data);
@@ -74,7 +83,7 @@ export const EvidenceViewer = ({
         })
         .catch(() => {
           if (isMounted) {
-            setProcessedBlobUrl(activeProcUrl);
+            setProcessedBlobUrl(getFullMediaUrl ? getFullMediaUrl(activeProcUrl) : activeProcUrl);
           }
         });
     }

@@ -106,7 +106,7 @@ export const ScanResults = () => {
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-brand-100 dark:bg-emerald-950/80 text-brand-800 dark:text-emerald-300">
                 Packaged Commodity Audit
               </span>
-              <span className="text-xs text-slate-400 dark:text-slate-500 font-mono">ID: {scan.id.substring(0, 8)}</span>
+              <span className="text-xs text-slate-400 dark:text-slate-500 font-mono">ID: {String(scan?.id || '').substring(0, 8)}</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight mt-1">
               {scan.product_name || 'Packaged Commodity (Unlabeled)'}
@@ -205,7 +205,7 @@ export const ScanResults = () => {
                 <p className="text-xs font-mono text-slate-800 dark:text-slate-200 break-all bg-slate-50 dark:bg-slate-800/80 p-2 rounded-xl border border-slate-200 dark:border-slate-700">
                   {scan.qr_code}
                 </p>
-                {scan.qr_code.startsWith('http') && (
+                {typeof scan.qr_code === 'string' && scan.qr_code.startsWith('http') && (
                   <a
                     href={scan.qr_code}
                     target="_blank"
@@ -262,7 +262,7 @@ export const ScanResults = () => {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {scan.fields?.map((field) => (
                 <tr key={field.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                  <td className="py-3 px-4 font-bold text-slate-900 dark:text-slate-100">{field.field_name.replace(/_/g, ' ')}</td>
+                  <td className="py-3 px-4 font-bold text-slate-900 dark:text-slate-100">{String(field.field_name || '').replace(/_/g, ' ')}</td>
                   <td className="py-3 px-4">
                     <span className="px-2 py-0.5 rounded text-[10px] uppercase font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                       {field.field_category}

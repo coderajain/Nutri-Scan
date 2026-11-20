@@ -87,6 +87,18 @@ export const ScanUpload = () => {
     });
   };
 
+  const formatErrorMessage = (err, fallback) => {
+    const detail = err.response?.data?.detail;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) {
+      return detail.map((d) => (typeof d === 'object' ? d.msg || JSON.stringify(d) : String(d))).join('; ');
+    }
+    if (detail && typeof detail === 'object') {
+      return detail.message || JSON.stringify(detail);
+    }
+    return err.message || fallback;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (files.length === 0) {
@@ -99,6 +111,9 @@ export const ScanUpload = () => {
     setBatchResults(null);
 
     const formData = new FormData();
+    if (files.length === 1) {
+      formData.append('file', files[0].file);
+    }
     files.forEach((item) => {
       formData.append('files', item.file);
     });
@@ -147,7 +162,7 @@ export const ScanUpload = () => {
         clearTimeout(timer2);
         clearTimeout(timer3);
         clearTimeout(timer4);
-        setError(err.response?.data?.detail || 'Multi-view scan failed. Please check image quality.');
+        setError(formatErrorMessage(err, 'Multi-view scan failed. Please check image quality.'));
         setLoading(false);
       }
     } else {
@@ -162,7 +177,7 @@ export const ScanUpload = () => {
         setBatchResults(res.data);
         setLoading(false);
       } catch (err) {
-        setError(err.response?.data?.detail || 'Batch processing failed.');
+        setError(formatErrorMessage(err, 'Batch processing failed.'));
         setLoading(false);
       }
     }

@@ -42,7 +42,7 @@ export const ScoreCards = ({
             </div>
           </div>
           <span className="text-xs uppercase font-extrabold px-2.5 py-1 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-full border border-slate-200 dark:border-slate-700 shadow-2xs">
-            {complianceStatus?.replace('_', ' ')}
+            {String(complianceStatus || '').replace(/_/g, ' ')}
           </span>
         </div>
 
@@ -80,7 +80,7 @@ export const ScoreCards = ({
             </div>
           </div>
           <span className="text-xs uppercase font-extrabold px-2.5 py-1 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-full border border-slate-200 dark:border-slate-700 shadow-2xs">
-            {nutritionStatus?.replace('_', ' ')}
+            {String(nutritionStatus || '').replace(/_/g, ' ')}
           </span>
         </div>
 

@@ -9,9 +9,23 @@ export const apiClient = axios.create({
   },
 });
 
-// Request interceptor: attach bearer token
+// Helper to construct absolute media/asset URLs when needed outside apiClient
+export const getFullMediaUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('blob:') || path.startsWith('data:') || path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return API_BASE ? `${API_BASE.replace(/\/+$/, '')}${cleanPath}` : cleanPath;
+};
+
+// Request interceptor: attach bearer token and normalize URL paths
 apiClient.interceptors.request.use(
   (config) => {
+    // Prevent duplicate /api/v1 prefix if the requested path already includes it
+    if (config.url && config.url.startsWith('/api/v1/')) {
+      config.url = config.url.replace(/^\/api\/v1/, '');
+    }
     const token = localStorage.getItem('nutriscan_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

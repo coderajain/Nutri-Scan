@@ -4,7 +4,7 @@ import re
 import time
 import uuid
 import aiofiles
-from typing import Optional
+from typing import Optional, Union
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request
 from fastapi.responses import FileResponse
@@ -359,7 +359,7 @@ async def _execute_scan_pipeline(
 async def upload_and_process_scan(
     request: Request,
     file: Optional[UploadFile] = File(None),
-    files: Optional[list[UploadFile]] = File(None),
+    files: Optional[Union[list[UploadFile], UploadFile]] = File(None),
     product_name: str = Form(None),
     brand_name: str = Form(None),
     rule_version_tag: str = Form("LM-PC-2011-v1.0"),
@@ -371,7 +371,10 @@ async def upload_and_process_scan(
     """
     upload_files = []
     if files:
-        upload_files.extend(files)
+        if isinstance(files, list):
+            upload_files.extend(files)
+        else:
+            upload_files.append(files)
     if file and file not in upload_files:
         upload_files.append(file)
 
