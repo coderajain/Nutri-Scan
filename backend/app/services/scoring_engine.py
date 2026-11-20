@@ -84,10 +84,10 @@ class ScoringEngine:
     ) -> tuple[float | None, NutritionStatus, bool]:
         """
         Calculates the Nutritional Profile Score (0.0 - 100.0).
-        STRICT GUARDRAIL (SCORE-004):
-        If fewer than 3 mandatory nutrients are declared, marks as INSUFFICIENT_DATA and returns score=None.
+        Evaluates detected nutrition values against WHO & ICMR benchmarks.
+        Requires at least 2 detected nutrients to compute a score (SCORE-004).
         """
-        if nutrients_present_count < 3:
+        if nutrients_present_count < 2:
             return None, NutritionStatus.INSUFFICIENT_DATA, True
 
         base_score = 75.0  # neutral midpoint

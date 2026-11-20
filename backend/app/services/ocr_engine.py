@@ -210,8 +210,8 @@ class OCREngine:
                             except (ValueError, TypeError):
                                 pass
 
-                # Pass 2: Natural grayscale multi-orientation scanning (handles normal, inverted 180°, and vertical 90°/270° packaging)
-                img_cv = cv2.imread(target_raw)
+                # Pass 2: Grayscale multi-orientation scanning on optimal-scaled image
+                img_cv = cv2.imread(image_path)
                 if img_cv is not None:
                     h, w = img_cv.shape[:2]
                     gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
@@ -223,8 +223,6 @@ class OCREngine:
                     gray_180 = cv2.cvtColor(rot_180, cv2.COLOR_BGR2GRAY)
                     txt_180_p6 = pytesseract.image_to_string(gray_180, config=r"--oem 1 --psm 6 -l eng")
                     raw_candidates.extend(txt_180_p6.splitlines())
-                    txt_180_p3 = pytesseract.image_to_string(gray_180, config=r"--oem 1 --psm 3 -l eng")
-                    raw_candidates.extend(txt_180_p3.splitlines())
 
                     # Pass 2c: 90° & 270° rotations for vertical side-panels and rotated label faces
                     for rot_code in (cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE):
@@ -233,10 +231,10 @@ class OCREngine:
                         txt_side = pytesseract.image_to_string(gray_side, config=r"--oem 1 --psm 6 -l eng")
                         raw_candidates.extend(txt_side.splitlines())
 
-                    # Pass 3: Nutrition table region zoom (bottom 48% with gamma adjustment)
-                    if h >= 800:
-                        crop = img_cv[int(h * 0.50):, :]
-                        up = cv2.resize(crop, (0, 0), fx=1.8, fy=1.8, interpolation=cv2.INTER_CUBIC)
+                    # Pass 3: Nutrition table region zoom (bottom 50% with gamma adjustment)
+                    if h >= 600:
+                        crop = img_cv[int(h * 0.45):, :]
+                        up = cv2.resize(crop, (0, 0), fx=1.5, fy=1.5, interpolation=cv2.INTER_CUBIC)
                         up_gray = cv2.cvtColor(up, cv2.COLOR_BGR2GRAY)
                         lut = np.array([((i / 255.0) ** (1.0 / 0.75)) * 255 for i in np.arange(0, 256)]).astype("uint8")
                         g_crop = cv2.LUT(up_gray, lut)
@@ -246,7 +244,7 @@ class OCREngine:
                 # Pass 4: PSM 6 on shadow-compensated image
                 tess_tmp = image_path + "_tess_prep.png"
                 try:
-                    preprocess_for_tesseract(target_raw, tess_tmp)
+                    preprocess_for_tesseract(image_path, tess_tmp)
                     with Image.open(tess_tmp) as t_img:
                         txt2 = pytesseract.image_to_string(t_img, config=r"--oem 1 --psm 6 -l eng")
                         raw_candidates.extend(txt2.splitlines())

@@ -111,9 +111,12 @@ export const ScanUpload = () => {
     setBatchResults(null);
 
     const formData = new FormData();
-    if (files.length === 1) {
+    // Append primary face as 'file' for maximum compatibility with all backend versions
+    if (files.length > 0) {
       formData.append('file', files[0].file);
-    } else {
+    }
+    // Append all faces as 'files' for multi-view processing
+    if (files.length > 1 || uploadMode === 'batch') {
       files.forEach((item) => {
         formData.append('files', item.file);
       });

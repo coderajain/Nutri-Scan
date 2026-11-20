@@ -359,21 +359,24 @@ async def _execute_scan_pipeline(
 async def upload_and_process_scan(
     request: Request,
     file: Optional[UploadFile] = File(None),
-    product_name: str = Form(None),
-    brand_name: str = Form(None),
+    product_name: Optional[str] = Form(None),
+    brand_name: Optional[str] = Form(None),
     rule_version_tag: str = Form("LM-PC-2011-v1.0"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Upload and analyze packaging images (supports single image or multiple faces for one product).
+    Accepts files from form data under 'files', 'file', 'images', or 'image'.
     """
     form_data = await request.form()
     upload_files = []
 
+    # Priority 1: Direct 'file' parameter if passed by client
     if file:
         upload_files.append(file)
 
+    # Priority 2: Extract all files from 'files' and 'file' multi-value form fields
     for field_key in ("files", "file", "images", "image"):
         for item in form_data.getlist(field_key):
             if hasattr(item, "filename") and item.filename and item not in upload_files:
@@ -382,7 +385,7 @@ async def upload_and_process_scan(
     if not upload_files:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No packaging image uploaded. Please provide at least one image file.",
+            detail="No packaging image uploaded. Please select at least one image file.",
         )
 
     return await _execute_scan_pipeline(
@@ -399,7 +402,6 @@ async def upload_and_process_scan(
 @router.post("/batch", response_model=BatchScanResponse)
 async def upload_batch_scans(
     request: Request,
-    files: list[UploadFile] = File(...),
     rule_version_tag: str = Form("LM-PC-2011-v1.0"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -408,7 +410,14 @@ async def upload_batch_scans(
     Batch upload multiple separate products at once.
     Each file represents an individual product package.
     """
-    if not files:
+    form_data = await request.form()
+    batch_files = []
+    for field_key in ("files", "file", "images", "image"):
+        for item in form_data.getlist(field_key):
+            if hasattr(item, "filename") and item.filename and item not in batch_files:
+                batch_files.append(item)
+
+    if not batch_files:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Please provide at least one image file for batch processing.",
@@ -417,7 +426,7 @@ async def upload_batch_scans(
     successful_scans = []
     failed_uploads = []
 
-    for f in files:
+    for f in batch_files:
         try:
             detail = await _execute_scan_pipeline(
                 upload_files=[f],
@@ -436,7 +445,7 @@ async def upload_batch_scans(
             })
 
     return {
-        "total_uploaded": len(files),
+        "total_uploaded": len(batch_files),
         "successful_scans": successful_scans,
         "failed_uploads": failed_uploads,
     }

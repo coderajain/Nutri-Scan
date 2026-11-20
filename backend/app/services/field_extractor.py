@@ -586,42 +586,48 @@ class FieldExtractor:
         """
         nutrition_specs = [
             ("energy_kcal", [
-                r'(?:energy|calories)?\s*[|~]?\s*(?:1)?([1-9]\d{2}(?:\.\d+)?)\s*k?cal(?:\s*energy)?',
-                r'(?:energy|calories)[\s\.:\-_|]*([1-9]\d{1,3}(?:\.\d+)?)',
+                r'(?:energy|calories|caloric\s*value)[\s\.:\-_|~]*(?:approx\.?)?\s*([1-9]\d{1,3}(?:\.\d+)?)\s*(?:kcal|cal|kj)?',
                 r'\b([1-9]\d{2})\s*kcal\b',
+                r'(?:energy|calories)?\s*[|~]?\s*(?:1)?([1-9]\d{2}(?:\.\d+)?)\s*k?cal',
             ], "kcal"),
             ("total_fat_g", [
-                r'(?:total\s*fat|fat)[\s\.:\-_|]*(?:gy|g|gm)?[\s\.:\-_|]*\b([0-9]{1,2}(?:\.\d+)?)\b\s*(?:gy|g|gm)?(?!\s*(?:pe\b|per\b|serve|serving|pack|portion))',
-                r'(?:total\s*fat|fat)[^\w\n]*\b([0-9]{1,2}(?:\.\d+)?)\b\s*(?:gy|g|gm)?(?!\s*(?:pe\b|per\b|serve|serving|pack|portion))',
+                r'(?:total\s*fat|fat)[\s\.:\-_|~]*(?:approx\.?)?\s*\b([0-9]{1,2}(?:\.\d+)?)\b\s*(?:gy|g|gm)?',
+                r'(?:total\s*fat|fat)[^\w\n\r]*\b([0-9]{1,2}(?:\.\d+)?)\b',
             ], "g"),
             ("saturated_fat_g", [
-                r'(?:saturated\s*fat|sat\s*fat|ssceleseratad)[\s\.:\-_|]*(?:gy|g|gm)?[\s\.:\-_|]*([0-9]{1,2}(?:\.\d+)?)\s*(?:gy|g|gm)?(?!\s*(?:pe\b|per\b|serve|serving))',
-                r'(?:saturated\s*fat|sat\s*fat)[^\d\n]*([0-9]{1,2}(?:\.\d+)?)\s*(?:gy|g|gm)?(?!\s*(?:pe\b|per\b|serve|serving))',
+                r'(?:saturated\s*fat|sat\s*fat|ssceleseratad)[\s\.:\-_|~]*(?:approx\.?)?\s*([0-9]{1,2}(?:\.\d+)?)\s*(?:gy|g|gm)?',
+                r'(?:saturated\s*fat|sat\s*fat)[^\d\n\r]*([0-9]{1,2}(?:\.\d+)?)',
             ], "g"),
             ("trans_fat_g", [
-                r'trans\s*fat[\s\.:\-_|]*(?:gy|g|gm)?[\s\.:\-_|]*([0-9]{1,2}(?:\.\d+)?)\s*(?:gy|g|gm)?(?!\s*(?:pe\b|per\b|serve|serving))',
-                r'trans\s*fat[^\d\n]*([0-9]{1,2}(?:\.\d+)?)\s*(?:gy|g|gm)?(?!\s*(?:pe\b|per\b|serve|serving))',
+                r'trans\s*fat[\s\.:\-_|~]*(?:approx\.?)?\s*([0-9]{1,2}(?:\.\d+)?)\s*(?:gy|g|gm)?',
+                r'trans\s*fat[^\d\n\r]*([0-9]{1,2}(?:\.\d+)?)',
             ], "g"),
             ("cholesterol_mg", [
-                r'cholesterol[\s\.:\-_|]*(?:mg)?[\s\.:\-_|]*([0-9]{1,4}(?:\.\d+)?)',
+                r'cholesterol[\s\.:\-_|~]*(?:approx\.?)?\s*([0-9]{1,4}(?:\.\d+)?)\s*(?:mg)?',
             ], "mg"),
             ("sodium_mg", [
-                r'sodium[\s\.:\-_|]*(?:mg)?[\s\.:\-_|]*([0-9]{1,4}(?:\.\d+)?)',
+                r'sodium[\s\.:\-_|~]*(?:approx\.?)?\s*([0-9]{1,4}(?:\.\d+)?)\s*(?:mg)?',
+                r'sodium[^\d\n\r]*([0-9]{1,4}(?:\.\d+)?)',
             ], "mg"),
             ("protein_g", [
-                r'protein[\s\.:\-_|]*(?:gy|g|gm)?[\s\.:\-_|]*([0-9]{1,2}(?:\.\d+)?)',
+                r'(?:protein|proteins)[\s\.:\-_|~]*(?:approx\.?)?\s*([0-9]{1,2}(?:\.\d+)?)\s*(?:gy|g|gm)?',
+                r'protein[^\d\n\r]*([0-9]{1,2}(?:\.\d+)?)',
             ], "g"),
             ("carbohydrate_g", [
-                r'(?:carbohydrates?|carb)[\s\.:\-_|]*(?:gy|g|gm)?[\s\.:\-_|]*([0-9]{1,2}(?:\.\d+)?)',
+                r'(?:carbohydrates?|carb|carbs)[\s\.:\-_|~]*(?:approx\.?)?\s*([0-9]{1,2}(?:\.\d+)?)\s*(?:gy|g|gm)?',
+                r'(?:carbohydrates?|carb)[^\d\n\r]*([0-9]{1,2}(?:\.\d+)?)',
             ], "g"),
             ("total_sugars_g", [
-                r'(?:total\s*sugars?|sugars?)[\s\.:\-_|]*(?:gy|g|gm)?[\s\.:\-_|]*([0-9]{1,2}(?:\.\d+)?)',
+                r'(?:total\s*sugars?|sugars?|sugar)[\s\.:\-_|~]*(?:approx\.?)?\s*([0-9]{1,2}(?:\.\d+)?)\s*(?:gy|g|gm)?',
+                r'(?:total\s*sugars?|sugars?)[^\d\n\r]*([0-9]{1,2}(?:\.\d+)?)',
             ], "g"),
             ("added_sugars_g", [
-                r'added\s*sugars?[\s\.:\-_|]*(?:gy|g|gm)?[\s\.:\-_|]*([0-9]{1,2}(?:\.\d+)?)',
+                r'added\s*sugars?[\s\.:\-_|~]*(?:approx\.?)?\s*([0-9]{1,2}(?:\.\d+)?)\s*(?:gy|g|gm)?',
+                r'added\s*sugars?[^\d\n\r]*([0-9]{1,2}(?:\.\d+)?)',
             ], "g"),
             ("dietary_fiber_g", [
-                r'(?:dietary\s*fiber|fiber)[\s\.:\-_|]*(?:gy|g|gm)?[\s\.:\-_|]*([0-9]{1,2}(?:\.\d+)?)',
+                r'(?:dietary\s*fiber|fiber)[\s\.:\-_|~]*(?:approx\.?)?\s*([0-9]{1,2}(?:\.\d+)?)\s*(?:gy|g|gm)?',
+                r'(?:dietary\s*fiber|fiber)[^\d\n\r]*([0-9]{1,2}(?:\.\d+)?)',
             ], "g"),
         ]
 

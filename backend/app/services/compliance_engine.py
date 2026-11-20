@@ -53,7 +53,7 @@ class ComplianceEngine:
             # 2. Nutrition Panel evaluation (LM-R-013)
             if field_name == "nutrition_panel":
                 present_nutrients = [k for k, v in nutrition.items() if v is not None]
-                if len(present_nutrients) >= 4:
+                if len(present_nutrients) >= 1:
                     findings.append({
                         "rule_id": rule.id,
                         "field_name": field_name,
@@ -63,7 +63,7 @@ class ComplianceEngine:
                         "title": "Nutritional Panel Declared",
                         "message": f"Found nutritional information table with {len(present_nutrients)} declared values.",
                         "observed_value": ", ".join(present_nutrients),
-                        "expected_condition": "Nutritional table per 100g/ml containing energy, protein, carbohydrates, and fats.",
+                        "expected_condition": "Nutritional table per 100g/ml containing energy, protein, carbohydrates, or fats.",
                         "is_font_size_flag": False,
                         "requires_manual_review": False,
                     })
