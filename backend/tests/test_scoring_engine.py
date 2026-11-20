@@ -54,3 +54,33 @@ def test_insufficient_nutrition_data():
     assert score is None
     assert status == NutritionStatus.INSUFFICIENT_DATA
     assert is_insufficient is True
+
+
+def test_authenticity_score_calculation():
+    """Verifies authenticity score evaluates brand, FSSAI, batch, barcode, and company details."""
+    extracted_declarations = {
+        "brand_name": "Vadilal",
+        "product_name": "American Nuts Ice Cream",
+        "fssai_license": "10012021000071",
+        "batch_number": "AN-2026-X1",
+        "manufacturer_address": "Vadilal House, 53 Shrimali Society, Navrangpura, Ahmedabad",
+        "consumer_care_email": "customercare@vadilalgroup.com",
+        "consumer_care_phone": "1800-233-1234",
+    }
+
+    score, status, breakdown = ScoringEngine.calculate_authenticity_score(
+        declarations=extracted_declarations,
+        findings=[],
+        barcode="8901262010115",
+        qr_code="https://vadilalgroup.com",
+    )
+
+    assert score >= 80.0
+    assert status == "authentic"
+    assert breakdown["brand_identity"]["status"] == "verified"
+    assert breakdown["regulatory_licensing"]["status"] == "verified"
+    assert breakdown["traceability"]["status"] in ["verified", "partial"]
+    assert breakdown["barcode_identification"]["status"] == "verified"
+    assert breakdown["company_registration"]["status"] == "verified"
+    assert breakdown["consumer_care"]["status"] == "verified"
+

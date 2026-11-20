@@ -55,11 +55,14 @@ class Scan(Base):
     # Independent Scores (SCORE-001, SCORE-002: Completely separated)
     compliance_score: Mapped[float] = mapped_column(Float, nullable=True)  # 0.0 - 100.0
     nutrition_score: Mapped[float] = mapped_column(Float, nullable=True)   # 0.0 - 100.0
+    authenticity_score: Mapped[float] = mapped_column(Float, nullable=True)  # 0.0 - 100.0 (Original vs Fake)
 
     # Categorical Statuses
     overall_status: Mapped[ScanStatus] = mapped_column(SAEnum(ScanStatus, name="scan_statuses"), default=ScanStatus.PENDING, nullable=False)
     compliance_status: Mapped[ComplianceStatus] = mapped_column(SAEnum(ComplianceStatus, name="compliance_statuses"), default=ComplianceStatus.PENDING, nullable=False)
     nutrition_status: Mapped[NutritionStatus] = mapped_column(SAEnum(NutritionStatus, name="nutrition_statuses"), default=NutritionStatus.PENDING, nullable=False)
+    authenticity_status: Mapped[str] = mapped_column(String(50), default="inconclusive", nullable=False)  # authentic, suspicious, inconclusive
+    authenticity_breakdown: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
 
     # Guardrail Indicators (LM-005, SCORE-004)
     has_font_size_flags: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

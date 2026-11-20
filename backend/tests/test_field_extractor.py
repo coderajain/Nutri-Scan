@@ -82,3 +82,52 @@ def test_zero_fabrication_on_empty_text():
 
     assert empty_result["ingredients"] == []
     assert empty_result["allergens"] == []
+
+
+def test_ice_cream_packaging_extraction():
+    """Tests extraction on realistic ice-cream packaging OCR text (Vadilal American Nuts)."""
+    ocr_text = """
+    Vadilal
+    AMERICAN NUTS ICE CREAM
+    INGREDIENTS: Milk Solids, Sugar, Water, Sugar Boiled Confectionary (4.9%) [Stabilisers (440), Acidity Regulator (330)], Pineapple, Cashew (3.4%), Almond (2.4%), Emulsifiers (471) and Stabilisers (412, 407).
+    ALLERGEN INFORMATION: Contains Milk, Cashew, Almond and Soy.
+    Nutritional Information
+    Serve Size: Single Serve
+    Per 100g | Total Fat 10.8 g | Saturated Fat 5.8 g | Trans Fat 0.1 g | Cholesterol 28 mg | Sodium 68 mg
+    Carbohydrate 28.5 g | Total Sugars 23.5 g | Added Sugars 18.0 g | Protein 3.6 g
+    Energy 226 kcal
+    STORE AT -18 C OR BELOW UNDER HYGIENIC CONDITIONS
+    FSSAI LICENCE NO. (SEE FIRST CHARACTER OF BATCH NO.)
+    Customer Care Executive no.: 079-26448025, feedback@vadilalgroup.com, www.vadilalicecreams.com
+    Net Quantity: 100 ml
+    MRP: ₹ 35.00
+    """
+    extracted = FieldExtractor.extract_all(ocr_text)
+    decl = extracted["declarations"]
+    nut = extracted["nutrition"]
+
+    assert decl["product_name"] is not None
+    assert "American Nuts Ice Cream" in decl["product_name"]["normalized_value"]
+
+    assert decl["brand_name"] is not None
+    assert decl["brand_name"]["normalized_value"] == "Vadilal"
+
+    assert decl["consumer_care"] is not None
+    assert "079-26448025" in decl["consumer_care"]["normalized_value"]
+    assert "feedback@vadilalgroup.com" in decl["consumer_care"]["normalized_value"]
+    assert "www.vadilalicecreams.com" in decl["consumer_care"]["normalized_value"]
+
+    assert decl["storage_instructions"] is not None
+    assert "-18" in decl["storage_instructions"]["normalized_value"]
+
+    assert decl["fssai_license"] is not None
+    assert "Declared" in decl["fssai_license"]["normalized_value"]
+
+    assert nut["energy_kcal"]["numeric_value"] == 226.0
+    assert nut["total_fat_g"]["numeric_value"] == 10.8
+    assert nut["saturated_fat_g"]["numeric_value"] == 5.8
+    assert nut["trans_fat_g"]["numeric_value"] == 0.1
+    assert nut["protein_g"]["numeric_value"] == 3.6
+    assert nut["carbohydrate_g"]["numeric_value"] == 28.5
+    assert nut["total_sugars_g"]["numeric_value"] == 23.5
+    assert nut["sodium_mg"]["numeric_value"] == 68.0

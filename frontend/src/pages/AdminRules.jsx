@@ -66,11 +66,11 @@ export const AdminRules = () => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Administrator Control</span>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-1">
+          <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Administrator Control</span>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight mt-1">
             Statutory Rules & Version Manager (LM-001, LM-006)
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Historical scans remain permanently linked to their evaluation rule version
           </p>
         </div>
@@ -85,21 +85,21 @@ export const AdminRules = () => {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center space-x-2">
+        <div className="mb-4 p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-red-700 dark:text-red-300 text-xs flex items-center space-x-2">
           <AlertCircle className="h-4 w-4" />
           <span>{error}</span>
         </div>
       )}
 
       {success && (
-        <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs flex items-center space-x-2">
+        <div className="mb-4 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 text-emerald-700 dark:text-emerald-300 text-xs flex items-center space-x-2">
           <CheckCircle2 className="h-4 w-4" />
           <span>{success}</span>
         </div>
       )}
 
       {/* Version Selector Tabs */}
-      <div className="flex space-x-2 overflow-x-auto pb-2 border-b border-slate-200 mb-6">
+      <div className="flex space-x-2 overflow-x-auto pb-2 border-b border-slate-200 dark:border-slate-800 mb-6">
         {versions.map((v) => (
           <button
             key={v.id}
@@ -107,7 +107,7 @@ export const AdminRules = () => {
             className={`px-4 py-2 rounded-xl text-xs font-bold shrink-0 transition flex items-center space-x-2 ${
               selectedVersion?.id === v.id
                 ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
             }`}
           >
             <Scale className="h-4 w-4" />
@@ -123,15 +123,15 @@ export const AdminRules = () => {
 
       {/* Rules Table */}
       {selectedVersion && (
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
-          <div className="p-6 bg-slate-50 border-b border-slate-200">
-            <h3 className="text-base font-extrabold text-slate-900">{selectedVersion.title}</h3>
-            <p className="text-xs text-slate-500 mt-1">{selectedVersion.description}</p>
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden transition-colors">
+          <div className="p-6 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800">
+            <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100">{selectedVersion.title}</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{selectedVersion.description}</p>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-100 text-slate-700 uppercase tracking-wider text-[10px] font-extrabold">
+              <thead className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[10px] font-extrabold">
                 <tr>
                   <th className="py-3 px-4">Code</th>
                   <th className="py-3 px-4">Rule Title & Statutory Reference</th>
@@ -141,26 +141,26 @@ export const AdminRules = () => {
                   <th className="py-3 px-4">Validation Type</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {selectedVersion.rules?.map((rule) => (
-                  <tr key={rule.id} className="hover:bg-slate-50">
-                    <td className="py-3 px-4 font-mono font-bold text-blue-700">{rule.rule_code}</td>
+                  <tr key={rule.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                    <td className="py-3 px-4 font-mono font-bold text-blue-700 dark:text-blue-400">{rule.rule_code}</td>
                     <td className="py-3 px-4">
-                      <div className="font-bold text-slate-900">{rule.title}</div>
-                      <div className="text-[11px] text-slate-500 italic">{rule.legal_reference}</div>
+                      <div className="font-bold text-slate-900 dark:text-slate-100">{rule.title}</div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 italic">{rule.legal_reference}</div>
                     </td>
-                    <td className="py-3 px-4 font-mono text-[11px] text-slate-600">{rule.field_name}</td>
+                    <td className="py-3 px-4 font-mono text-[11px] text-slate-600 dark:text-slate-300">{rule.field_name}</td>
                     <td className="py-3 px-4">
                       <SeverityBadge severity={rule.severity} />
                     </td>
                     <td className="py-3 px-4">
                       {rule.is_mandatory ? (
-                        <span className="text-red-600 font-extrabold">YES</span>
+                        <span className="text-red-600 dark:text-red-400 font-extrabold">YES</span>
                       ) : (
-                        <span className="text-slate-400">NO</span>
+                        <span className="text-slate-400 dark:text-slate-500">NO</span>
                       )}
                     </td>
-                    <td className="py-3 px-4 font-mono text-[11px] text-slate-500">{rule.validation_type}</td>
+                    <td className="py-3 px-4 font-mono text-[11px] text-slate-500 dark:text-slate-400">{rule.validation_type}</td>
                   </tr>
                 ))}
               </tbody>
@@ -171,46 +171,46 @@ export const AdminRules = () => {
 
       {/* Create Version Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-200 shadow-xl">
-            <h3 className="text-lg font-black text-slate-900">Create New Statutory Rule Version</h3>
-            <p className="text-xs text-slate-500 mt-1">
+        <div className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-xl transition-colors">
+            <h3 className="text-lg font-black text-slate-900 dark:text-slate-100">Create New Statutory Rule Version</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               Adding a new version preserves older scans linked to prior versions (LM-006).
             </p>
 
             <form onSubmit={handleCreateVersion} className="mt-4 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Version Tag</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Version Tag</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. LM-PC-2011-v2.0"
                   value={newVersionTag}
                   onChange={(e) => setNewVersionTag(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Title</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Title</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Legal Metrology Amendment 2026 Ruleset"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Description</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Description</label>
                 <textarea
                   rows={3}
                   placeholder="Notes on regulatory updates..."
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
 
@@ -218,7 +218,7 @@ export const AdminRules = () => {
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition"
+                  className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
                 >
                   Cancel
                 </button>

@@ -53,6 +53,8 @@ class ScanSummaryResponse(BaseModel):
     nutrition_status: NutritionStatus
     compliance_score: Optional[float] = None
     nutrition_score: Optional[float] = None
+    authenticity_score: Optional[float] = None
+    authenticity_status: Optional[str] = "inconclusive"
     has_font_size_flags: bool
     is_data_insufficient: bool
     ocr_confidence_avg: Optional[float] = None
@@ -69,6 +71,7 @@ class ScanDetailResponse(ScanSummaryResponse):
     pdf_report_url: Optional[str] = None
     ocr_raw_text: Optional[str] = None
     uncertainty_flags: list[Any] = []
+    authenticity_breakdown: Optional[dict[str, Any]] = None
     barcode: Optional[str] = None
     barcode_format: Optional[str] = None
     barcode_country: Optional[str] = None

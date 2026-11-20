@@ -3,12 +3,12 @@ import { AlertTriangle, Info } from 'lucide-react';
 
 export const Disclaimers = () => {
   return (
-    <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 my-6 text-xs text-amber-900 leading-relaxed shadow-xs">
-      <div className="flex items-center space-x-2 font-bold mb-2 text-amber-950">
-        <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+    <div className="bg-amber-50/80 dark:bg-amber-950/25 border border-amber-200 dark:border-amber-900/60 rounded-2xl p-4 my-6 text-xs text-amber-900 dark:text-amber-200 leading-relaxed shadow-xs transition-colors">
+      <div className="flex items-center space-x-2 font-bold mb-2 text-amber-950 dark:text-amber-100">
+        <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
         <span className="uppercase tracking-wide text-[11px]">Academic & Regulatory Disclaimers (SRS Mandate)</span>
       </div>
-      <ul className="space-y-1.5 list-disc pl-5 text-amber-800">
+      <ul className="space-y-1.5 list-disc pl-5 text-amber-800 dark:text-amber-300/90">
         <li>
           <b>Automated Screening Tool (SAF-001, LM-007):</b> NutriScan v1.0 provides automated decision-support screening for educational and inspection evaluation. It does NOT constitute a statutory or legally binding certification under the Legal Metrology Act, 2009 or FSSAI Regulations.
         </li>

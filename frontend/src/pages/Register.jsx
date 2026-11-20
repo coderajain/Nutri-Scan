@@ -34,28 +34,28 @@ export const Register = () => {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-[#06110E] via-[#081513] to-[#0B1726]">
+    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-100 via-emerald-50/50 to-teal-50/40 dark:from-[#06110E] dark:via-[#081513] dark:to-[#0B1726] transition-colors duration-300">
       {/* Background Visual and 4 Angled 3D Floating Glass Cards */}
       <AuthBackgroundVisual />
 
-      {/* Existing White Register Card Centered Dead-Center with Radial Glow */}
+      {/* Existing White/Dark Register Card Centered Dead-Center with Radial Glow */}
       <div className="relative z-10 flex items-center justify-center min-h-[calc(100vh-72px)] px-4 py-8">
-        <div className="w-full max-w-md shadow-[0_0_80px_rgba(16,185,129,0.22)] rounded-3xl">
-          <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+        <div className="w-full max-w-md shadow-xl dark:shadow-[0_0_80px_rgba(16,185,129,0.22)] rounded-3xl transition-shadow">
+          <div className="max-w-md w-full space-y-8 bg-white dark:bg-slate-900/95 dark:backdrop-blur-md p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
             <div className="text-center">
               <div className="flex justify-center mb-5">
                 <Link to="/" className="inline-block">
                   <img src={logo} alt="NutriScan Logo" className="h-12 w-auto object-contain hover:opacity-90 transition" />
                 </Link>
               </div>
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight">Create your account</h2>
-              <p className="mt-1 text-xs text-slate-500">
+              <h2 className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">Create your account</h2>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 Sign up to scan and evaluate packaged food labels
               </p>
             </div>
 
             {error && (
-              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center space-x-2">
+              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900/60 text-red-700 dark:text-red-300 text-xs flex items-center space-x-2">
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 <span>{error}</span>
               </div>
@@ -63,52 +63,52 @@ export const Register = () => {
 
             <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
                   Full Name
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                  <User className="absolute left-3.5 top-3 h-4 w-4 text-slate-400 dark:text-slate-500" />
                   <input
                     type="text"
                     required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Alex Johnson"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white dark:focus:bg-slate-800 transition"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
                   Email Address
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                  <Mail className="absolute left-3.5 top-3 h-4 w-4 text-slate-400 dark:text-slate-500" />
                   <input
                     type="email"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@example.com"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white dark:focus:bg-slate-800 transition"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
                   Password (Min 8 Characters)
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                  <Lock className="absolute left-3.5 top-3 h-4 w-4 text-slate-400 dark:text-slate-500" />
                   <input
                     type="password"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white dark:focus:bg-slate-800 transition"
                   />
                 </div>
               </div>
@@ -124,9 +124,9 @@ export const Register = () => {
             </form>
 
             <div className="text-center">
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Already have an account?{' '}
-                <Link to="/login" className="font-bold text-brand-600 hover:text-brand-700">
+                <Link to="/login" className="font-bold text-brand-600 dark:text-brand-400 hover:text-brand-700">
                   Sign In
                 </Link>
               </p>

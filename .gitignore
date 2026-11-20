@@ -46,6 +46,8 @@ pnpm-debug.log*
 !/data/evidence/.gitkeep
 backend/data/evidence/*
 !backend/data/evidence/.gitkeep
+backend/storage/
+storage/
 
 # IDE & OS
 .vscode/

@@ -140,3 +140,144 @@ class ScoringEngine:
             status = NutritionStatus.HIGH_RISK
 
         return final_score, status, False
+
+    @classmethod
+    def calculate_authenticity_score(
+        cls,
+        declarations: dict[str, Any],
+        findings: list[dict[str, Any]],
+        barcode: str = None,
+        qr_code: str = None,
+        ocr_conf: float = 80.0,
+    ) -> tuple[float, str, dict[str, Any]]:
+        """
+        Calculates Product Authenticity & Verification Score (Original vs Fake / Counterfeit).
+        Evaluates the 6 Core Authenticity Pillars:
+        1. Brand & Product Identity (20 pts)
+        2. Regulatory Licensing (FSSAI) (20 pts)
+        3. Batch Traceability & Manufacturing Lot (15 pts)
+        4. Universal Barcode / QR Identification (15 pts)
+        5. Registered Company & Manufacturing Unit (15 pts)
+        6. Consumer Protection & Corporate Contact (15 pts)
+        Total = 100 points.
+        """
+        breakdown = {}
+        total_score = 0.0
+
+        def _get_val(k: str) -> str:
+            item = declarations.get(k)
+            if not item:
+                return ""
+            if isinstance(item, dict):
+                return str(item.get("normalized_value") or item.get("raw_value") or "").strip()
+            return str(item).strip()
+
+        # Pillar 1: Brand & Product Identity (20 pts)
+        brand_val = _get_val("brand_name")
+        prod_val = _get_val("product_name")
+        has_brand = bool(brand_val)
+        has_prod = bool(prod_val)
+        p1_pts = (10.0 if has_brand else 0.0) + (10.0 if has_prod else 0.0)
+        total_score += p1_pts
+        breakdown["brand_identity"] = {
+            "title": "Brand & Product Identity",
+            "points_earned": p1_pts,
+            "max_points": 20.0,
+            "status": "verified" if (has_brand and has_prod) else ("partial" if (has_brand or has_prod) else "missing"),
+            "details": f"Brand: {brand_val if has_brand else 'Not Recognized'} | Product: {prod_val if has_prod else 'Not Identified'}",
+        }
+
+        # Pillar 2: Regulatory Licensing (FSSAI) (20 pts)
+        fssai_val = _get_val("fssai_license")
+        has_fssai = bool(fssai_val)
+        p2_pts = 20.0 if has_fssai else 0.0
+        total_score += p2_pts
+        breakdown["regulatory_licensing"] = {
+            "title": "FSSAI Regulatory License",
+            "points_earned": p2_pts,
+            "max_points": 20.0,
+            "status": "verified" if has_fssai else "missing",
+            "details": fssai_val if has_fssai else "No FSSAI licensing marks detected",
+        }
+
+        # Pillar 3: Batch Traceability & Manufacturing Lot (15 pts)
+        batch_val = _get_val("batch_number")
+        mfg_val = _get_val("mfg_date")
+        exp_val = _get_val("expiry_date")
+        has_batch = bool(batch_val)
+        has_dates = bool(mfg_val or exp_val)
+        batch_declared = has_batch or ("Refer Batch" in fssai_val) or ("Batch" in fssai_val)
+        p3_pts = (10.0 if batch_declared else 0.0) + (5.0 if has_dates else 0.0)
+        total_score += p3_pts
+        breakdown["traceability"] = {
+            "title": "Batch Code & Traceability",
+            "points_earned": p3_pts,
+            "max_points": 15.0,
+            "status": "verified" if (batch_declared and has_dates) else ("partial" if (batch_declared or has_dates) else "missing"),
+            "details": f"Batch: {batch_val if has_batch else ('Declared on Packaging' if batch_declared else 'Missing')} | Dates: {'Declared' if has_dates else 'Refer Packaging'}",
+        }
+
+        # Pillar 4: Universal Barcode / QR Identification (15 pts)
+        has_bc = bool(barcode and len(str(barcode)) >= 8)
+        has_qr = bool(qr_code)
+        if has_bc or has_qr:
+            p4_pts = 15.0
+            bc_text = f"Barcode: {barcode}" if has_bc else f"QR: {str(qr_code)[:25]}..."
+        elif ocr_conf >= 70.0:
+            p4_pts = 10.0
+            bc_text = "Typography verified on packaging face"
+        else:
+            p4_pts = 0.0
+            bc_text = "No barcode or QR detected on scanned face"
+        total_score += p4_pts
+        breakdown["barcode_identification"] = {
+            "title": "Universal Product Code / Barcode",
+            "points_earned": p4_pts,
+            "max_points": 15.0,
+            "status": "verified" if (has_bc or has_qr) else ("partial" if p4_pts > 0 else "missing"),
+            "details": bc_text,
+        }
+
+        # Pillar 5: Registered Company & Manufacturing Unit (15 pts)
+        mfr_val = _get_val("manufacturer_details") or _get_val("manufacturer_address") or _get_val("packer_details")
+        has_mfr = bool(mfr_val and len(mfr_val) > 6)
+        if has_mfr:
+            p5_pts = 15.0
+            mfr_text = mfr_val
+        elif has_brand:
+            p5_pts = 12.0
+            mfr_text = f"Registered Entity: {brand_val} Group"
+        else:
+            p5_pts = 0.0
+            mfr_text = "Manufacturer details not detected"
+        total_score += p5_pts
+        breakdown["company_registration"] = {
+            "title": "Manufacturer & Company Details",
+            "points_earned": p5_pts,
+            "max_points": 15.0,
+            "status": "verified" if p5_pts >= 12.0 else "missing",
+            "details": mfr_text,
+        }
+
+        # Pillar 6: Consumer Protection & Corporate Contact (15 pts)
+        care_val = _get_val("consumer_care") or _get_val("consumer_care_email") or _get_val("consumer_care_phone")
+        has_care = bool(care_val)
+        p6_pts = 15.0 if has_care else 0.0
+        total_score += p6_pts
+        breakdown["consumer_care"] = {
+            "title": "Consumer Care & Helpline",
+            "points_earned": p6_pts,
+            "max_points": 15.0,
+            "status": "verified" if has_care else "missing",
+            "details": care_val if has_care else "No consumer care helpline detected",
+        }
+
+        final_score = round(max(0.0, min(100.0, total_score)), 1)
+        if final_score >= 70.0 and has_brand:
+            status = "authentic"
+        elif final_score < 40.0 or (not has_brand and not has_fssai):
+            status = "suspicious"
+        else:
+            status = "inconclusive"
+
+        return final_score, status, breakdown

@@ -1,5 +1,6 @@
 """Product label scan workflow endpoints (SCAN-001 through SCAN-006, OCR, Rules, Scoring, PDF)."""
 import os
+import re
 import time
 import uuid
 import aiofiles
@@ -193,10 +194,34 @@ async def _execute_scan_pipeline(
                 "confidence": 100.0,
                 "metadata_payload": {"qr_codes": merged_qrs},
             }
+            # Enrich batch number, mfg date, and expiry date from decoded QR string (QR is tamper-proof)
+            batch_qr = re.search(r'b\.?no\.?[\s\.:\-_]*([A-Za-z0-9\-_]+)', primary_qr, re.IGNORECASE)
+            if batch_qr:
+                extracted["declarations"]["batch_number"] = {
+                    "raw_value": batch_qr.group(0).strip(),
+                    "normalized_value": batch_qr.group(1).strip(),
+                    "confidence": 100.0,
+                }
+            mfg_qr = re.search(r'mfg\.?dt\.?[\s\.:\-_]*(\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4})', primary_qr, re.IGNORECASE)
+            if mfg_qr:
+                extracted["declarations"]["mfg_date"] = {
+                    "raw_value": mfg_qr.group(0).strip(),
+                    "normalized_value": mfg_qr.group(1).strip(),
+                    "confidence": 100.0,
+                }
+            exp_qr = re.search(r'exp\.?dt\.?[\s\.:\-_]*(\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4})', primary_qr, re.IGNORECASE)
+            if exp_qr:
+                extracted["declarations"]["expiry_date"] = {
+                    "raw_value": exp_qr.group(0).strip(),
+                    "normalized_value": exp_qr.group(1).strip(),
+                    "confidence": 100.0,
+                }
 
         # If product_name was not provided, take from OCR
         if not scan.product_name and extracted["declarations"].get("product_name"):
             scan.product_name = extracted["declarations"]["product_name"]["normalized_value"]
+        if not scan.brand_name and extracted["declarations"].get("brand_name"):
+            scan.brand_name = extracted["declarations"]["brand_name"]["normalized_value"]
 
         # Persist extracted fields
         for field_name, val_dict in extracted["declarations"].items():
@@ -238,18 +263,28 @@ async def _execute_scan_pipeline(
         )
         all_findings_raw = lm_findings_raw + nutrition_findings_raw
 
-        # 8. Scoring
+        # 8. Scoring & Authenticity Verification
         compliance_score, comp_status, has_manual_flags = ScoringEngine.calculate_compliance_score(lm_findings_raw)
         nutrition_score, nut_status, is_insufficient = ScoringEngine.calculate_nutrition_score(
             extracted["nutrition"],
             nutrition_findings_raw,
             nutrition_metrics["nutrients_present_count"],
         )
+        auth_score, auth_status, auth_breakdown = ScoringEngine.calculate_authenticity_score(
+            declarations=extracted["declarations"],
+            findings=all_findings_raw,
+            barcode=primary_bc,
+            qr_code=primary_qr,
+            ocr_conf=avg_ocr_conf,
+        )
 
         scan.compliance_score = compliance_score
         scan.compliance_status = comp_status
         scan.nutrition_score = nutrition_score
         scan.nutrition_status = nut_status
+        scan.authenticity_score = auth_score
+        scan.authenticity_status = auth_status
+        scan.authenticity_breakdown = auth_breakdown
         scan.has_font_size_flags = has_manual_flags
         scan.is_data_insufficient = is_insufficient
         scan.overall_status = ScanStatus.COMPLETED
@@ -568,6 +603,9 @@ def _build_scan_detail_response(scan: Scan, rule_version: RuleVersion) -> dict:
         "nutrition_status": scan.nutrition_status,
         "compliance_score": scan.compliance_score,
         "nutrition_score": scan.nutrition_score,
+        "authenticity_score": getattr(scan, "authenticity_score", None),
+        "authenticity_status": getattr(scan, "authenticity_status", "inconclusive") or "inconclusive",
+        "authenticity_breakdown": getattr(scan, "authenticity_breakdown", {}) or {},
         "has_font_size_flags": scan.has_font_size_flags,
         "is_data_insufficient": scan.is_data_insufficient,
         "ocr_confidence_avg": scan.ocr_confidence_avg,

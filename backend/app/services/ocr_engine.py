@@ -1,6 +1,7 @@
-"""OCR Engine: PaddleOCR (primary deep-learning engine) with Tesseract Fallback."""
+"""OCR Engine: High-speed Multi-Pass Tesseract 5.x with PaddleOCR fallback."""
 import os
 import shutil
+import re
 import cv2
 import numpy as np
 from PIL import Image
@@ -49,13 +50,13 @@ def get_paddle_ocr():
             _paddle_instance = PaddleOCR(use_textline_orientation=True, lang="en")
             logger.info("PaddleOCR engine initialized successfully.")
         except Exception as e:
-            logger.warning(f"PaddleOCR initialization failed: {e}. Falling back to Tesseract.")
+            logger.warning(f"PaddleOCR initialization failed: {e}. Using Tesseract.")
             _paddle_instance = False
     return _paddle_instance if _paddle_instance is not False else None
 
 
 class OCREngine:
-    """Primary PaddleOCR engine with vertical box-grouping and Tesseract fallback."""
+    """Multi-pass Tesseract OCR engine with intelligent line deduplication and PaddleOCR fallback."""
 
     def __init__(self, tesseract_cmd: Optional[str] = None):
         if tesseract_cmd and os.path.exists(tesseract_cmd):
@@ -72,11 +73,44 @@ class OCREngine:
             return False
 
     @staticmethod
+    def deduplicate_lines(raw_lines: list[str]) -> list[str]:
+        """
+        Deduplicates OCR lines while filtering noise:
+        1. Discards lines without at least two alphanumeric characters.
+        2. Discards lines that are exact or substring duplicates of existing lines.
+        3. Replaces shorter fragments with longer, cleaner lines when detected.
+        """
+        unique_lines: list[str] = []
+        for line in raw_lines:
+            line_str = line.strip()
+            if len(re.findall(r'[A-Za-z0-9]', line_str)) < 2:
+                continue
+
+            cleaned = re.sub(r'^[^\w\(\[\"\'₹~]+|[^\w\)\]\"\'%\.]+$', '', line_str).strip()
+            if not cleaned or len(cleaned) < 2:
+                continue
+
+            already_present = False
+            for i, existing in enumerate(unique_lines):
+                if cleaned.lower() == existing.lower():
+                    already_present = True
+                    break
+                if cleaned.lower() in existing.lower():
+                    already_present = True
+                    break
+                if existing.lower() in cleaned.lower() and len(cleaned) > len(existing) + 3:
+                    unique_lines[i] = cleaned
+                    already_present = True
+                    break
+
+            if not already_present:
+                unique_lines.append(cleaned)
+
+        return unique_lines
+
+    @staticmethod
     def group_boxes_into_rows(boxes, texts, scores) -> tuple[list[str], list[float]]:
-        """
-        Groups OCR bounding boxes by vertical Y-coordinate into clean rows.
-        Sorts boxes within each row left-to-right so nutrition labels align with numbers.
-        """
+        """Groups OCR bounding boxes by vertical Y-coordinate into clean rows."""
         if boxes is None or len(boxes) == 0:
             return [t.strip() for t in texts if t.strip()], [float(s) for s in scores]
 
@@ -100,7 +134,6 @@ class OCREngine:
                 "h": h,
             })
 
-        # Sort top-to-bottom by vertical coordinate
         items.sort(key=lambda x: (x["ymin"], x["xmin"]))
 
         rows = []
@@ -143,31 +176,29 @@ class OCREngine:
 
     def extract_text(self, image_path: str, raw_image_path: Optional[str] = None) -> dict:
         """
-        Ultra-fast, high-precision two-pass OCR pipeline:
+        High-precision multi-pass OCR pipeline:
         Pass 1: Tesseract PSM 3 on enhanced image (sparse declarations, dates, licenses, product name)
-        Pass 2: Tesseract PSM 6 on grid-erased preprocessed image (nutrition facts tables)
-        Executes in ~1-1.5 seconds per face on CPU with zero stalls.
-        PaddleOCR is reserved as fallback if Tesseract is unavailable.
+        Pass 2: Tesseract PSM 4 on natural grayscale image (multi-column tables, nutrition values, contacts)
+        Pass 3: Tesseract PSM 6 on shadow-compensated preprocessed image (dense text blocks & declarations)
+        Pass 4: Tesseract PSM 6 on zoomed nutrition table region (resolves small dense table numerals)
         """
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"Image not found for OCR: {image_path}")
 
-        lines: list[str] = []
+        raw_candidates: list[str] = []
         confidences: list[float] = []
+        target_raw = raw_image_path if raw_image_path and os.path.exists(raw_image_path) else image_path
 
         # 1. Primary Engine: High-speed Multi-pass Tesseract 5.x
         if self.is_tesseract_available():
             try:
                 import pytesseract
-                # Pass 1: Sparse layout on preprocessed image
+
+                # Pass 1: PSM 3 on enhanced image
                 with Image.open(image_path) as img:
                     txt1 = pytesseract.image_to_string(img, config=r"--oem 1 --psm 3 -l eng")
-                    for l in txt1.splitlines():
-                        c = l.strip()
-                        if len(c) >= 2 and c not in lines:
-                            lines.append(c)
+                    raw_candidates.extend(txt1.splitlines())
 
-                    # Extract word-level confidences
                     data = pytesseract.image_to_data(img, config=r"--oem 1 --psm 3 -l eng", output_type=pytesseract.Output.DICT)
                     for i, word in enumerate(data.get("text", [])):
                         w = word.strip()
@@ -179,17 +210,46 @@ class OCREngine:
                             except (ValueError, TypeError):
                                 pass
 
-                # Pass 2: Morphological grid-line removal for nutrition facts table
-                target_raw = raw_image_path if raw_image_path and os.path.exists(raw_image_path) else image_path
+                # Pass 2: Natural grayscale multi-orientation scanning (handles normal, inverted 180°, and vertical 90°/270° packaging)
+                img_cv = cv2.imread(target_raw)
+                if img_cv is not None:
+                    h, w = img_cv.shape[:2]
+                    gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
+                    txt_p4 = pytesseract.image_to_string(gray, config=r"--oem 1 --psm 4 -l eng")
+                    raw_candidates.extend(txt_p4.splitlines())
+
+                    # Pass 2b: 180-degree rotation (resolves inverted packaging, curved lids, and upside-down photos)
+                    rot_180 = cv2.rotate(img_cv, cv2.ROTATE_180)
+                    gray_180 = cv2.cvtColor(rot_180, cv2.COLOR_BGR2GRAY)
+                    txt_180_p6 = pytesseract.image_to_string(gray_180, config=r"--oem 1 --psm 6 -l eng")
+                    raw_candidates.extend(txt_180_p6.splitlines())
+                    txt_180_p3 = pytesseract.image_to_string(gray_180, config=r"--oem 1 --psm 3 -l eng")
+                    raw_candidates.extend(txt_180_p3.splitlines())
+
+                    # Pass 2c: 90° & 270° rotations for vertical side-panels and rotated label faces
+                    for rot_code in (cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE):
+                        rot_side = cv2.rotate(img_cv, rot_code)
+                        gray_side = cv2.cvtColor(rot_side, cv2.COLOR_BGR2GRAY)
+                        txt_side = pytesseract.image_to_string(gray_side, config=r"--oem 1 --psm 6 -l eng")
+                        raw_candidates.extend(txt_side.splitlines())
+
+                    # Pass 3: Nutrition table region zoom (bottom 48% with gamma adjustment)
+                    if h >= 800:
+                        crop = img_cv[int(h * 0.50):, :]
+                        up = cv2.resize(crop, (0, 0), fx=1.8, fy=1.8, interpolation=cv2.INTER_CUBIC)
+                        up_gray = cv2.cvtColor(up, cv2.COLOR_BGR2GRAY)
+                        lut = np.array([((i / 255.0) ** (1.0 / 0.75)) * 255 for i in np.arange(0, 256)]).astype("uint8")
+                        g_crop = cv2.LUT(up_gray, lut)
+                        txt_tbl = pytesseract.image_to_string(g_crop, config=r"--oem 1 --psm 6 -l eng")
+                        raw_candidates.extend(txt_tbl.splitlines())
+
+                # Pass 4: PSM 6 on shadow-compensated image
                 tess_tmp = image_path + "_tess_prep.png"
                 try:
                     preprocess_for_tesseract(target_raw, tess_tmp)
                     with Image.open(tess_tmp) as t_img:
                         txt2 = pytesseract.image_to_string(t_img, config=r"--oem 1 --psm 6 -l eng")
-                        for l in txt2.splitlines():
-                            c = l.strip()
-                            if len(c) >= 2 and c not in lines:
-                                lines.append(c)
+                        raw_candidates.extend(txt2.splitlines())
                 finally:
                     if os.path.exists(tess_tmp):
                         try:
@@ -201,7 +261,7 @@ class OCREngine:
                 logger.warning(f"Tesseract extraction error: {te}")
 
         # 2. Fallback Engine: PaddleOCR (only if Tesseract returned nothing)
-        if not lines:
+        if not raw_candidates:
             paddle = get_paddle_ocr()
             if paddle:
                 try:
@@ -214,16 +274,13 @@ class OCREngine:
                             scores = r.get("rec_scores", [])
                             if len(texts) > 0:
                                 row_lines, row_confs = self.group_boxes_into_rows(boxes, texts, scores)
-                                lines.extend(row_lines)
+                                raw_candidates.extend(row_lines)
                                 confidences.extend(row_confs)
                 except Exception as e:
                     logger.warning(f"PaddleOCR fallback error: {e}")
 
-        # Clean duplicates preserving order
-        unique_lines = []
-        for line in lines:
-            if line not in unique_lines:
-                unique_lines.append(line)
+        # Intelligent line deduplication & artifact suppression
+        unique_lines = self.deduplicate_lines(raw_candidates)
 
         raw_text = "\n".join(unique_lines).strip()
         avg_conf = float(sum(confidences) / len(confidences)) if confidences else (80.0 if unique_lines else 0.0)

@@ -83,6 +83,13 @@ class BarcodeScanner:
         except Exception as e:
             logger.warning(f"cv2.QRCodeDetector not available: {e}")
 
+        wechat_detector = None
+        try:
+            if hasattr(cv2, "wechat_qrcode_WeChatQRCode"):
+                wechat_detector = cv2.wechat_qrcode_WeChatQRCode()
+        except Exception as e:
+            logger.debug(f"WeChatQRCode detector not available: {e}")
+
         # Scan across 0, 90, 180, and 270 degree rotations for curved/rotated packaging
         rotations = [
             (0, img),
@@ -115,23 +122,50 @@ class BarcodeScanner:
                 except Exception as exc:
                     logger.debug(f"Barcode detection pass failed at {angle}°: {exc}")
 
-            # 2. 2D QR Code Detection
-            if qr_detector is not None:
-                try:
-                    text, pts, _ = qr_detector.detectAndDecode(current_img)
-                    if text and text.strip():
-                        clean_text = text.strip()
-                        if clean_text not in seen_qrs:
-                            seen_qrs.add(clean_text)
-                            is_url = clean_text.startswith("http://") or clean_text.startswith("https://")
-                            qr_codes.append({
-                                "data": clean_text,
-                                "type": "QR_CODE",
-                                "is_url": is_url,
-                                "angle_detected": angle,
-                            })
-                except Exception as exc:
-                    logger.debug(f"QR detection pass failed at {angle}°: {exc}")
+            # 2. 2D QR Code Detection (both standard and inverted passes)
+            img_variants = [current_img]
+            try:
+                img_variants.append(cv2.bitwise_not(current_img))
+            except Exception:
+                pass
+
+            for candidate_img in img_variants:
+                # WeChat QR Detector pass (high sensitivity)
+                if wechat_detector is not None:
+                    try:
+                        texts, pts = wechat_detector.detectAndDecode(candidate_img)
+                        for t in texts:
+                            if t and t.strip():
+                                clean_t = t.strip()
+                                if clean_t not in seen_qrs:
+                                    seen_qrs.add(clean_t)
+                                    is_url = clean_t.startswith("http://") or clean_t.startswith("https://")
+                                    qr_codes.append({
+                                        "data": clean_t,
+                                        "type": "QR_CODE",
+                                        "is_url": is_url,
+                                        "angle_detected": angle,
+                                    })
+                    except Exception as wex:
+                        logger.debug(f"WeChat QR pass failed at {angle}°: {wex}")
+
+                # Standard OpenCV QR Detector pass
+                if qr_detector is not None and not qr_codes:
+                    try:
+                        text, pts, _ = qr_detector.detectAndDecode(candidate_img)
+                        if text and text.strip():
+                            clean_text = text.strip()
+                            if clean_text not in seen_qrs:
+                                seen_qrs.add(clean_text)
+                                is_url = clean_text.startswith("http://") or clean_text.startswith("https://")
+                                qr_codes.append({
+                                    "data": clean_text,
+                                    "type": "QR_CODE",
+                                    "is_url": is_url,
+                                    "angle_detected": angle,
+                                })
+                    except Exception as exc:
+                        logger.debug(f"QR detection pass failed at {angle}°: {exc}")
 
             # If both a barcode and a QR were already found, we can stop rotating
             if barcodes and qr_codes:

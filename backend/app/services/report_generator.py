@@ -29,6 +29,8 @@ class PDFReportGenerator:
         original_image_path: str,
         output_pdf_path: str,
         created_at_str: str,
+        authenticity_score: float | None = None,
+        authenticity_status: str | None = None,
     ) -> str:
         """Assembles a publication-ready multi-section PDF document."""
         os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
