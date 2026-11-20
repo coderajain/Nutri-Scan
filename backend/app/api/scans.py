@@ -359,7 +359,6 @@ async def _execute_scan_pipeline(
 async def upload_and_process_scan(
     request: Request,
     file: Optional[UploadFile] = File(None),
-    files: Optional[Union[list[UploadFile], UploadFile]] = File(None),
     product_name: str = Form(None),
     brand_name: str = Form(None),
     rule_version_tag: str = Form("LM-PC-2011-v1.0"),
@@ -369,14 +368,16 @@ async def upload_and_process_scan(
     """
     Upload and analyze packaging images (supports single image or multiple faces for one product).
     """
+    form_data = await request.form()
     upload_files = []
-    if files:
-        if isinstance(files, list):
-            upload_files.extend(files)
-        else:
-            upload_files.append(files)
-    if file and file not in upload_files:
+
+    if file:
         upload_files.append(file)
+
+    for field_key in ("files", "file", "images", "image"):
+        for item in form_data.getlist(field_key):
+            if hasattr(item, "filename") and item.filename and item not in upload_files:
+                upload_files.append(item)
 
     if not upload_files:
         raise HTTPException(

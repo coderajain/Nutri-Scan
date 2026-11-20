@@ -113,10 +113,11 @@ export const ScanUpload = () => {
     const formData = new FormData();
     if (files.length === 1) {
       formData.append('file', files[0].file);
+    } else {
+      files.forEach((item) => {
+        formData.append('files', item.file);
+      });
     }
-    files.forEach((item) => {
-      formData.append('files', item.file);
-    });
     formData.append('rule_version_tag', ruleVersionTag);
 
     if (uploadMode === 'multi_face') {
